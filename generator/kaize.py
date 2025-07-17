@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: MIT
 
-import json
 import math
 import re
 import time
@@ -10,9 +9,9 @@ import requests as req
 from alive_progress import alive_bar  # type: ignore
 from bs4 import BeautifulSoup, Tag
 from fake_useragent import FakeUserAgent  # type: ignore
-from prettyprint import Platform, PrettyPrint, Status
+from generator.const import pprint
+from generator.prettyprint import Platform, Status
 
-pprint = PrettyPrint()
 fua = FakeUserAgent(browsers=["firefox", "chrome", "edge", "safari"])
 rand_fua: str = f"{fua.random}"  # type: ignore
 
@@ -323,35 +322,28 @@ class Kaize:
         :rtype: list[dict[str, Any]]
         """
         anime_data: list[dict[str, Any]] = []
-        file_path = "database/raw/kaize.json"
-        try:
-            raise ConnectionError("Force use local file")
-            self._session_set()
-            pages = self.pages()
-            with alive_bar(pages, title="Getting data", spinner=None) as bar:  # type: ignore
-                for page in range(1, pages + 1):
-                    anime_data.extend(self._get_data_index(page))
-                    bar()
-            with open(file_path, "w", encoding="utf-8") as file:
-                anime_data.sort(key=lambda x: x["title"])  # type: ignore
-                json.dump(anime_data, file)
-            pprint.print(
-                Platform.KAIZE,
-                Status.PASS,
-                f"Done getting data, total data: {len(anime_data)},",
-                f"or around {str(math.ceil(len(anime_data) / 50))} pages,",
-                "expected pages:",
-                str(pages),
-            )
-        except ConnectionError:
-            pprint.print(
-                Platform.KAIZE,
-                Status.WARN,
-                "Unable to connect to kaize.io, loading from local file",
-            )
-            with open(file_path, "r", encoding="utf-8") as file:
-                anime_data = json.load(file)
+
+        pprint.print(Platform.KAIZE, Status.INFO, "Starting anime data collection")
+
+        self._session_set()
+        pages = self.pages()
+
+        with alive_bar(pages, title="Getting Kaize data", spinner=None) as bar:  # type: ignore
+            for page in range(1, pages + 1):
+                anime_data.extend(self._get_data_index(page))
+                bar()
+
         anime_data.sort(key=lambda x: x["title"])  # type: ignore
+
+        pprint.print(
+            Platform.KAIZE,
+            Status.PASS,
+            f"Done getting data, total data: {len(anime_data)},",
+            f"or around {str(math.ceil(len(anime_data) / 50))} pages,",
+            "expected pages:",
+            str(pages),
+        )
+
         return anime_data
 
     @staticmethod

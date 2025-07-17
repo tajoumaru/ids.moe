@@ -1,18 +1,14 @@
 # SPDX-License-Identifier: MIT
 
-import json
-import os
-from datetime import datetime
 from typing import Any, Union
 
 import requests as req
 from alive_progress import alive_bar  # type: ignore
 from bs4 import BeautifulSoup, Tag
-from const import GITHUB_DISPATCH
 from fake_useragent import FakeUserAgent  # type: ignore
-from prettyprint import Platform, PrettyPrint, Status
+from generator.const import pprint
+from generator.prettyprint import Platform, Status
 
-pprint = PrettyPrint()
 fua = FakeUserAgent(browsers=["chrome"])
 rand_fua: str = f"{fua.random}"  # type: ignore
 
@@ -142,68 +138,36 @@ class OtakOtaku:
         :return: The anime data
         :rtype: list[dict[str, Any]]
         """
-        file_path = "database/raw/otakotaku.json"
         anime_list: list[dict[str, Any]] = []
-        latest_file_path = "database/raw/_latest_otakotaku.txt"
-        if os.path.exists(file_path):
-            with open(file_path, "r", encoding="utf-8") as file:
-                anime_list = json.load(file)
-        try:
-            # raise ConnectionError("Failed to connect to otakotaku.com")
-            latest_id = self.get_latest_anime()
-            if not latest_id:
-                raise ConnectionError("Failed to connect to otakotaku.com")
-            if (
-                not datetime.now().day in [1, 15]
-                and len(anime_list) > 0
-                and not GITHUB_DISPATCH
-            ):
-                with open(latest_file_path, "r", encoding="utf-8") as file:
-                    latest = int(file.read().strip())
-                if latest == latest_id:
+
+        pprint.print(Platform.OTAKOTAKU, Status.INFO, "Starting anime data collection")
+
+        latest_id = self.get_latest_anime()
+        if not latest_id:
+            raise ConnectionError("Failed to connect to otakotaku.com")
+
+        # Get all anime data from 1 to latest_id
+        with alive_bar(latest_id, title="Getting OtakOtaku data", spinner=None) as bar:  # type: ignore
+            for anime_id in range(1, latest_id + 1):
+                data_index = self._get_data(anime_id)
+                if not data_index:
                     pprint.print(
                         Platform.OTAKOTAKU,
-                        Status.PASS,
-                        "Data is up to date, loading from local file",
+                        Status.ERR,
+                        f"Failed to get data index for anime id: {anime_id},"
+                        " data may be empty or invalid",
                     )
-                    return anime_list
-                latest = latest + 1
-                loop = latest_id - latest + 1
-            else:
-                anime_list = []  # remove possible duplicate
-                latest = 1
-                loop = latest_id
-            with alive_bar(loop, title="Getting data", spinner=None) as bar:  # type: ignore
-                for anime_id in range(latest, latest_id + 1):
-                    data_index = self._get_data(anime_id)
-                    if not data_index:
-                        pprint.print(
-                            Platform.OTAKOTAKU,
-                            Status.ERR,
-                            f"Failed to get data index for anime id: {anime_id},"
-                            " data may be empty or invalid",
-                        )
-                        bar()
-                        continue
-                    anime_list.append(data_index)
                     bar()
-            with open(latest_file_path, "w", encoding="utf-8") as file:
-                file.write(str(latest_id))
-            with open(file_path, "w", encoding="utf-8") as file:
-                anime_list.sort(key=lambda x: x["title"])  # type: ignore
-                json.dump(anime_list, file)
-            pprint.print(
-                Platform.OTAKOTAKU, Status.PASS, f"Total anime data: {len(anime_list)}"
-            )
-        except ConnectionError:
-            pprint.print(
-                Platform.OTAKOTAKU,
-                Status.WARN,
-                "Failed to get data, loading from local file",
-            )
-            with open(file_path, "r", encoding="utf-8") as file:
-                anime_list = json.load(file)
+                    continue
+                anime_list.append(data_index)
+                bar()
+
         anime_list.sort(key=lambda x: x["title"])  # type: ignore
+
+        pprint.print(
+            Platform.OTAKOTAKU, Status.PASS, f"Total anime data: {len(anime_list)}"
+        )
+
         return anime_list
 
     @staticmethod

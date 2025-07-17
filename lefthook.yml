@@ -1,0 +1,12 @@
+pre-commit:
+  parallel: true
+  commands:
+    type-check:
+      glob: "*.py"
+      run: uvx ty check
+    lint:
+      glob: "*.py"
+      run: uvx ruff check --fix {staged_files}
+    format:
+      glob: "*.py"
+      run: uvx ruff format {staged_files}

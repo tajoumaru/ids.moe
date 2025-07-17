@@ -1,13 +1,20 @@
 import os
 from typing import Any
 
-from dotenv import load_dotenv
-from prettyprint import PrettyPrint
+from generator.prettyprint import PrettyPrint
 
-# if .env file exists, load it
-if os.path.isfile(".env"):
+try:
+    from dotenv import load_dotenv
+
+    HAS_DOTENV = True
+except ImportError:
+    HAS_DOTENV = False
+
+if HAS_DOTENV and os.path.isfile(".env"):
     load_dotenv()
 
+
+# Environment variables for scrapers
 KAIZE_XSRF_TOKEN = os.getenv("KAIZE_XSRF_TOKEN")
 """Kaize XSRF token"""
 KAIZE_SESSION = os.getenv("KAIZE_SESSION")
@@ -17,8 +24,102 @@ KAIZE_EMAIL = os.getenv("KAIZE_EMAIL")
 KAIZE_PASSWORD = os.getenv("KAIZE_PASSWORD")
 """User password for Kaize login"""
 
+# GitHub Actions detection
 GITHUB_DISPATCH = os.getenv("GITHUB_EVENT_NAME") == "workflow_dispatch"
 """Whether the script is running from GitHub Actions workflow_dispatch event"""
+
+# GitHub API token
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
+"""GitHub API token for authenticated requests"""
+
+# Turso/SQLite database configuration
+TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL", "anime_data.db")
+"""Turso database URL (can be local file or remote URL)"""
+TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
+"""Turso authentication token (only for remote connections)"""
+
+
+# Process Turso URL to ensure proper format
+def process_turso_url(url: str, auth_token: str | None = None) -> str:
+    """Process Turso URL to ensure proper format."""
+    # Remove protocol if present
+    if url.startswith("libsql://"):
+        url = url[9:]
+    elif url.startswith("sqlite://"):
+        url = url[9:]
+    elif url.startswith("sqlite+libsql://"):
+        url = url[16:]
+
+    # Check if it's a remote URL
+    is_remote = ".turso.io" in url or ".aws" in url or "://" in url
+
+    # Build proper connection string
+    if is_remote:
+        connection_url = f"sqlite+libsql://{url}"
+        # Add secure parameter if auth token is provided
+        if auth_token and "?secure=true" not in connection_url:
+            connection_url += "?secure=true"
+    else:
+        # Local file
+        connection_url = f"sqlite+libsql:///{url}"
+
+    return connection_url
+
+
+# Process the URL
+TURSO_DATABASE_URL = process_turso_url(
+    TURSO_DATABASE_URL or "anime_data.db", TURSO_AUTH_TOKEN
+)
+
+# Cache configuration
+CACHE_DIR = os.getenv("CACHE_DIR", "cache")
+"""Cache directory for downloaded files"""
+
+# Scraper cache expiry
+SCRAPER_CACHE_EXPIRY_DAYS = int(os.getenv("SCRAPER_CACHE_EXPIRY_DAYS", "14"))
+"""Number of days to cache scraper data before re-running"""
+
+# Redis configuration - Upstash
+KV_REST_API_URL = os.getenv("KV_REST_API_URL")
+"""Upstash Redis REST API URL"""
+KV_REST_API_TOKEN = os.getenv("KV_REST_API_TOKEN")
+"""Upstash Redis REST API token"""
+
+# Redis configuration - Standard Redis
+REDIS_URL = os.getenv("REDIS_URL")
+"""Redis connection URL"""
+
+# Redis connection components (alternative to URL)
+REDIS_HOST = os.getenv("REDIS_HOST")
+"""Redis host"""
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379")) if os.getenv("REDIS_PORT") else 6379
+"""Redis port"""
+REDIS_USER = os.getenv("REDIS_USER")
+"""Redis username"""
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
+"""Redis password"""
+REDIS_DB = int(os.getenv("REDIS_DB", "0"))
+"""Redis database number (only used with component architecture)"""
+REDIS_SSL = os.getenv("REDIS_SSL", "").lower() in ["true", "1", "yes"]
+"""Redis SSL/TLS enabled"""
+REDIS_SSL_CERT_PATH = os.getenv("REDIS_SSL_CERT_PATH")
+"""Path to Redis SSL certificate"""
+REDIS_SSL_KEY_PATH = os.getenv("REDIS_SSL_KEY_PATH")
+"""Path to Redis SSL key"""
+REDIS_SSL_CA_PATH = os.getenv("REDIS_SSL_CA_PATH")
+"""Path to Redis SSL CA certificate"""
+
+# Build Redis URL from components if URL not provided
+if not REDIS_URL and REDIS_HOST:
+    # Build URL from components
+    auth_part = ""
+    if REDIS_USER and REDIS_PASSWORD:
+        auth_part = f"{REDIS_USER}:{REDIS_PASSWORD}@"
+    elif REDIS_PASSWORD:
+        auth_part = f":{REDIS_PASSWORD}@"
+
+    protocol = "rediss" if REDIS_SSL else "redis"
+    REDIS_URL = f"{protocol}://{auth_part}{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
 
 pprint = PrettyPrint()
 """PrettyPrint class instance"""

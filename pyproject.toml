@@ -9,12 +9,21 @@ dependencies = [
     "beautifulsoup4>=4.13.4",
     "cloudscraper>=1.2.71",
     "fake-useragent>=2.2.0",
-    "flask>=3.1.1",
     "fuzzywuzzy>=0.18.0",
-    "joblib>=1.5.1",
-    "python-dotenv>=1.1.1",
+    "libsql>=0.1.4",
     "python-levenshtein>=0.27.1",
     "python-slugify>=8.0.4",
     "redis>=6.2.0",
     "requests>=2.32.4",
+    "sqlalchemy-libsql>=0.2.0",
+    "upstash-redis>=1.4.0",
+    "zstandard>=0.23.0",
+]
+
+[dependency-groups]
+dev = [
+    "lefthook>=1.12.2",
+    "python-dotenv>=1.1.1",
+    "ruff>=0.12.3",
+    "ty>=0.0.1a14",
 ]

@@ -91,14 +91,26 @@ func init() {
 	// Initialize Redis connection
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {
-		redisAddr := os.Getenv("REDIS_ADDR")
-		if redisAddr == "" {
-			redisAddr = "localhost:6379"
+		// Use component-based configuration
+		redisHost := os.Getenv("REDIS_HOST")
+		if redisHost == "" {
+			redisHost = "localhost"
 		}
+		redisPort := os.Getenv("REDIS_PORT")
+		if redisPort == "" {
+			redisPort = "6379"
+		}
+		redisDB := 0
+		if dbStr := os.Getenv("REDIS_DB"); dbStr != "" {
+			if db, err := strconv.Atoi(dbStr); err == nil {
+				redisDB = db
+			}
+		}
+
 		rdb = redis.NewClient(&redis.Options{
-			Addr:     redisAddr,
+			Addr:     redisHost + ":" + redisPort,
 			Password: os.Getenv("REDIS_PASSWORD"),
-			DB:       0,
+			DB:       redisDB,
 		})
 	} else {
 		opt, _ := redis.ParseURL(redisURL)
@@ -238,7 +250,7 @@ func handleStatus(w http.ResponseWriter, r *http.Request, startTime time.Time) {
 			return
 		}
 	}
-	
+
 	var statusData map[string]interface{}
 	json.Unmarshal(statusFile, &statusData)
 	writeJSON(w, statusData, http.StatusOK)
@@ -283,7 +295,7 @@ func handleSchema(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	
+
 	var schemaData map[string]interface{}
 	json.Unmarshal(schemaFile, &schemaData)
 	writeJSON(w, schemaData, http.StatusOK)
@@ -295,7 +307,7 @@ func handleUpdated(w http.ResponseWriter, r *http.Request) {
 	if statusFile == nil {
 		statusFile, _ = os.ReadFile("status.json")
 	}
-	
+
 	var statusData map[string]interface{}
 	if err := json.Unmarshal(statusFile, &statusData); err == nil {
 		if updated, ok := statusData["updated"].(map[string]interface{}); ok {
@@ -308,7 +320,7 @@ func handleUpdated(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	
+
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write([]byte("Updated endpoint - timestamp not available"))
 }
@@ -385,7 +397,7 @@ func handleTMDBRoute(w http.ResponseWriter, r *http.Request) {
 
 func handleRedirect(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
-	
+
 	platform := getQueryParam(query, []string{"platform", "from", "f"})
 	platformID := getQueryParam(query, []string{"mediaid", "id", "i"})
 	target := getQueryParam(query, []string{"target", "to", "t"})
@@ -424,7 +436,7 @@ func handleRedirect(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	
+
 	if platform == "themoviedb" && !strings.Contains(platformID, "movie") {
 		platformID = "movie/" + platformID
 	}
@@ -456,11 +468,11 @@ func handleRedirect(w http.ResponseWriter, r *http.Request) {
 
 func handlePlatformRoute(w http.ResponseWriter, r *http.Request, path string) {
 	parts := strings.Split(strings.Trim(path, "/"), "/")
-	
+
 	if len(parts) == 1 {
 		// Platform array route
 		platform := parts[0]
-		
+
 		if strings.HasSuffix(path, ".tsv") {
 			w.Header().Set("Content-Type", "text/tab-separated-values")
 			w.Header().Set("Content-Disposition", "inline; filename=\"animeapi.tsv\"")

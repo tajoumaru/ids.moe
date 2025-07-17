@@ -19,40 +19,40 @@ Please read more information regarding using the API on your project in
 <details>
 <summary>Click to expand</summary>
 
-* [Why use AnimeAPI?](#why-use-animeapi)
-* [Why Avoid Using AnimeAPI?](#why-avoid-using-animeapi)
-* [Featured on](#featured-on)
-  * [Libraries](#libraries)
-  * [Projects, Apps, and Websites](#projects-apps-and-websites)
-* [Supported Platforms and Aliases](#supported-platforms-and-aliases)
-* [Statistic](#statistic)
-* [Usage](#usage)
-  * [Get status and statistics](#get-status-and-statistics)
-  * [Get latency report](#get-latency-report)
-  * [Get updated date and time](#get-updated-date-and-time)
-  * [Get all items in Array](#get-all-items-in-array)
-  * [Fetch all item as TSV (Tab Separated Values) file](#fetch-all-item-as-tsv-tab-separated-values-file)
-  * [Get All ID in Object/Dictionary format of each provider](#get-all-id-in-objectdictionary-format-of-each-provider)
-  * [Get All ID in Array/List format of each provider](#get-all-id-in-arraylist-format-of-each-provider)
-  * [Get anime relation mapping data](#get-anime-relation-mapping-data)
-    * [Provider exclusive rules](#provider-exclusive-rules)
-      * [Kitsu](#kitsu)
-      * [SIMKL](#simkl)
-      * [Shikimori](#shikimori)
-      * [The Movie DB](#the-movie-db)
-      * [Trakt](#trakt)
-  * [Redirect to provider's page](#redirect-to-providers-page)
-    * [Redirect: Parameters](#redirect-parameters)
-    * [Redirect: Response](#redirect-response)
-      * [Recommended/verbose path format](#recommendedverbose-path-format)
-      * [Short/aliased/alternative path format](#shortaliasedalternative-path-format)
-      * [Provider with slash (`/`) in `mediaid`](#provider-with-slash--in-mediaid)
-      * [Raw path format](#raw-path-format)
-* [Schema](#schema)
-  * [JSON Schema](#json-schema)
-  * [TypeScript](#typescript)
-  * [Python Dataclass](#python-dataclass)
-* [Acknowledgements](#acknowledgements)
+- [Why use AnimeAPI?](#why-use-animeapi)
+- [Why Avoid Using AnimeAPI?](#why-avoid-using-animeapi)
+- [Featured on](#featured-on)
+  - [Libraries](#libraries)
+  - [Projects, Apps, and Websites](#projects-apps-and-websites)
+- [Supported Platforms and Aliases](#supported-platforms-and-aliases)
+- [Statistic](#statistic)
+- [Usage](#usage)
+  - [Get status and statistics](#get-status-and-statistics)
+  - [Get latency report](#get-latency-report)
+  - [Get updated date and time](#get-updated-date-and-time)
+  - [Get all items in Array](#get-all-items-in-array)
+  - [Fetch all item as TSV (Tab Separated Values) file](#fetch-all-item-as-tsv-tab-separated-values-file)
+  - [Get All ID in Object/Dictionary format of each provider](#get-all-id-in-objectdictionary-format-of-each-provider)
+  - [Get All ID in Array/List format of each provider](#get-all-id-in-arraylist-format-of-each-provider)
+  - [Get anime relation mapping data](#get-anime-relation-mapping-data)
+    - [Provider exclusive rules](#provider-exclusive-rules)
+      - [Kitsu](#kitsu)
+      - [SIMKL](#simkl)
+      - [Shikimori](#shikimori)
+      - [The Movie DB](#the-movie-db)
+      - [Trakt](#trakt)
+  - [Redirect to provider's page](#redirect-to-providers-page)
+    - [Redirect: Parameters](#redirect-parameters)
+    - [Redirect: Response](#redirect-response)
+      - [Recommended/verbose path format](#recommendedverbose-path-format)
+      - [Short/aliased/alternative path format](#shortaliasedalternative-path-format)
+      - [Provider with slash (`/`) in `mediaid`](#provider-with-slash--in-mediaid)
+      - [Raw path format](#raw-path-format)
+- [Schema](#schema)
+  - [JSON Schema](#json-schema)
+  - [TypeScript](#typescript)
+  - [Python Dataclass](#python-dataclass)
+- [Acknowledgements](#acknowledgements)
 
 </details>
 
@@ -135,7 +135,7 @@ the raw files from original sources. The scraper scripts for Kaize, Nautiljon,
 and Otak-Otaku are licensed under the MIT license, and the raw JSON files they
 generate are licensed under the CC0 license instead. You are free to use these
 files and build your own database with them. For more information, please refer
-to [`database/raw/README.md`](database/raw/README.md).
+to [`database/README.md`](database/README.md).
 
 Additionally, since the project is object/key-value based and not array, the relation assumed by AnimeAPI is the same across database, where in fact it's not the case, especially with heavily moderated databases like AniDB, AniList, and Anime News Network. So, for any episode 0/prequel, specials, OVAs, movies, or older titles might get incorrect relationship. 
 

@@ -1,8 +1,0 @@
-{
-    "[markdown]": {
-        "editor.rulers": [
-            80
-        ]
-    },
-    "python.analysis.typeCheckingMode": "strict",
-}

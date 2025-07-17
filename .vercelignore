@@ -1,3 +1,4 @@
-database/*
-!database/*_object.json
-!database/animeapi.tsv
+# Ignore everything except api dir
+/*
+!api
+!vercel.json
