@@ -31,3 +31,5 @@ jobs:
 
       - name: Run Generator (Auto-installs dependencies)
         run: uv run generator
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
