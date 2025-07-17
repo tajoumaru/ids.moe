@@ -2,12 +2,130 @@
 
 import json
 from typing import Any, Union
+from multiprocessing import Pool, cpu_count
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import partial
 
 from alive_progress import alive_bar  # type: ignore
 from const import pprint
 from fuzzywuzzy import fuzz  # type: ignore
 from prettyprint import Platform, Status
 from slugify import slugify
+
+
+def _otakotaku_title_preprocessor(title):
+    """
+    OtakOtaku-specific title preprocessing function
+    """
+    replace_dict = {
+        "Season 2": "2nd Season",
+        "Season 3": "3rd Season",
+    }
+    # autopopulate the replace dict with ordinal numbers from 4 to 100
+    for i in range(4, 21):
+        # if it's 11, 12, 13, use th, else use st, nd, rd
+        if i in [11, 12, 13]:
+            replace_dict[f"Season {i}"] = f"{i}th Season"
+        elif i % 10 == 1:
+            replace_dict[f"Season {i}"] = f"{i}st Season"
+        elif i % 10 == 2:
+            replace_dict[f"Season {i}"] = f"{i}nd Season"
+        elif i % 10 == 3:
+            replace_dict[f"Season {i}"] = f"{i}rd Season"
+        else:
+            replace_dict[f"Season {i}"] = f"{i}th Season"
+    
+    for key, value in replace_dict.items():
+        title = title.replace(key, value)
+    return title
+
+
+def _fuzzy_match_single_item(args):
+    """
+    Match a single item against AOD items - designed for multiprocessing
+    
+    :param args: Tuple of (item, aod_items, threshold, title_preprocessor)
+    :return: (item, best_match) or None if no match
+    """
+    try:
+        item, aod_items, threshold, title_preprocessor = args
+        
+        title = item["title"]
+        if title_preprocessor:
+            title = title_preprocessor(title)
+        
+        best_match = None
+        best_ratio = threshold - 1
+        
+        # Early termination at perfect match
+        for aod_item in aod_items:
+            aod_title = aod_item["title"]
+            
+            # Quick exact match check first
+            if title == aod_title:
+                return (item, aod_item)
+            
+            # Fuzzy matching
+            ratio = fuzz.ratio(title, aod_title)
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_match = aod_item
+                
+                # If we hit a very high score, accept it immediately
+                if ratio >= 95:
+                    break
+        
+        if best_match and best_ratio >= threshold:
+            return (item, best_match)
+        return None
+    except Exception as e:
+        # Return the error with the item for debugging
+        return ("ERROR", str(e), item.get("title", "unknown"))
+
+
+def _fuzzy_match_optimized(unlinked_items: list[dict[str, Any]], aod_items: list[dict[str, Any]], threshold: int = 85, title_preprocessor=None):
+    """
+    Parallelized fuzzy matching that uses all CPU cores via multiprocessing
+    
+    :param unlinked_items: Items to match
+    :param aod_items: AOD items to match against  
+    :param threshold: Minimum fuzzy ratio
+    :param title_preprocessor: Optional function to preprocess titles
+    :return: List of (unlinked_item, matched_aod_item) tuples
+    """
+    # Pre-sort AOD items by title length for potential early wins
+    aod_sorted = sorted(aod_items, key=lambda x: len(x.get("title", "")))
+    
+    # Prepare arguments for multiprocessing
+    args_list = [(item, aod_sorted, threshold, title_preprocessor) for item in unlinked_items]
+    
+    # Use all available CPU cores
+    num_processes = cpu_count()
+    pprint.print(Platform.SYSTEM, Status.INFO, f"Using {num_processes} CPU cores for fuzzy matching")
+    
+    matches = []
+    errors = []
+    with Pool(processes=num_processes) as pool:
+        results = pool.map(_fuzzy_match_single_item, args_list)
+        
+        # Filter results and collect errors
+        for result in results:
+            if result is None:
+                continue
+            elif isinstance(result, tuple) and len(result) == 3 and result[0] == "ERROR":
+                errors.append(result)
+            else:
+                matches.append(result)
+    
+    # Report any errors found
+    if errors:
+        pprint.print(Platform.SYSTEM, Status.ERR, f"Fuzzy matching errors: {len(errors)} items failed")
+        for error_type, error_msg, title in errors[:5]:  # Show first 5 errors
+            pprint.print(Platform.SYSTEM, Status.ERR, f"Error matching '{title}': {error_msg}")
+        if len(errors) > 5:
+            pprint.print(Platform.SYSTEM, Status.ERR, f"... and {len(errors) - 5} more errors")
+    
+    return matches
 
 
 def link_kaize_to_mal(
@@ -25,13 +143,17 @@ def link_kaize_to_mal(
     :rtype: list[dict[str, Any]]
     """
     # add dummy data to aod
-    for item in aod:
-        item.update(
-            {
-                "kaize": None,
-                "kaize_id": None,
-            }
-        )
+    with alive_bar(
+        len(aod), title="Adding dummy Kaize data to AOD", spinner=None
+    ) as bar:  # type: ignore
+        for item in aod:
+            item.update(
+                {
+                    "kaize": None,
+                    "kaize_id": None,
+                }
+            )
+            bar()
     unlinked: list[dict[str, Any]] = []
     kz_fixed: list[dict[str, Any]] = []
     kz_dict: dict[str, Any] = {}
@@ -81,34 +203,35 @@ def link_kaize_to_mal(
             else:
                 unlinked.append(kz_item)
             bar()
-    # on unlinked, fuzzy search the title name
+    # on unlinked, fuzzy search the title name (optimized)
+    pprint.print(Platform.KAIZE, Status.INFO, f"Optimized fuzzy matching {len(unlinked)} items")
+    matches = _fuzzy_match_optimized(unlinked, aod, threshold=85)
+    
     with alive_bar(
-        len(unlinked), title="Fuzzy match title from both databases", spinner=None
+        len(matches), title="Processing fuzzy matches", spinner=None, disable=True
     ) as bar:  # type: ignore
-        for item in unlinked:
-            title = item["title"]
-            for aod_item in aod:
-                aod_title = aod_item["title"]
-                ratio = fuzz.ratio(title, aod_title)  # type: ignore
-                if ratio >= 85:
-                    kz_dat = {
-                        "anidb": aod_item["anidb"],
-                        "anilist": aod_item["anilist"],
-                        "myanimelist": aod_item["myanimelist"],
-                    }
-                    item.update(kz_dat)
-                    kz_fixed.append(item)
-                    aod_item.update(
-                        {
-                            "kaize": item["slug"],
-                            "kaize_id": None if item["kaize"] == 0 else item["kaize"],
-                        }
-                    )
-                    break
+        for item, aod_item in matches:
+            kz_dat = {
+                "anidb": aod_item["anidb"],
+                "anilist": aod_item["anilist"],
+                "myanimelist": aod_item["myanimelist"],
+            }
+            item.update(kz_dat)
+            kz_fixed.append(item)
+            aod_item.update(
+                {
+                    "kaize": item["slug"],
+                    "kaize_id": None if item["kaize"] == 0 else item["kaize"],
+                }
+            )
             bar()
     # load manual link data
     with open("database/raw/kaize_manual.json", "r", encoding="utf-8") as file:
         manual_link: dict[str, dict[str, str | int | None]] = json.load(file)
+    
+    # Pre-index AOD by title for O(1) lookups
+    aod_by_title = {item["title"]: item for item in aod}
+    
     with alive_bar(
         len(manual_link), title="Insert manual mappings", spinner=None
     ) as bar:  # type: ignore
@@ -124,34 +247,29 @@ def link_kaize_to_mal(
             ]:
                 bar()
                 continue
-            for aod_item in aod:
-                aod_title = aod_item["title"]
-                if title == aod_title:
-                    kz_dat = {
-                        "kaize": kz_item["kaize"],
-                        "kaize_id": None
-                        if kz_item["kaize_id"] == 0
-                        else kz_item["kaize_id"],
-                    }
-                    aod_item.update(kz_dat)
-                    kz_fixed.append(aod_item)
-                    # in unlinked, remove the item with the same id
-                    for item in unlinked:
-                        if item["kaize"] == kz_item["kaize"]:
-                            unlinked.remove(item)
-                            break
-                    break
+            
+            # O(1) lookup instead of O(n) search
+            aod_item = aod_by_title.get(title)
+            if aod_item:
+                kz_dat = {
+                    "kaize": kz_item["kaize"],
+                    "kaize_id": None
+                    if kz_item["kaize_id"] == 0
+                    else kz_item["kaize_id"],
+                }
+                aod_item.update(kz_dat)
+                kz_fixed.append(aod_item)
+                # in unlinked, remove the item with the same id (optimized)
+                unlinked = [item for item in unlinked if item["kaize"] != kz_item["kaize"]]
             bar()
-    # remove if unlinked data is already linked
+    # remove if unlinked data is already linked (optimized with set)
+    fixed_ids = {item["kaize"] for item in kz_fixed if "kaize" in item}
+    original_count = len(unlinked)
     with alive_bar(
-        len(kz_fixed), title="Removing unrequired data from unlinked", spinner=None
+        original_count, title="Removing unrequired data from unlinked", spinner=None
     ) as bar:  # type: ignore
-        for item in kz_fixed:
-            # if item exist with same id, remove
-            for unlinked_item in unlinked:
-                if item["kaize"] == unlinked_item["kaize"]:
-                    unlinked.remove(unlinked_item)
-                    break
+        unlinked = [item for item in unlinked if item["kaize"] not in fixed_ids]
+        for _ in range(original_count):
             bar()
     aod_list: list[dict[str, Any]] = []
     with alive_bar(
@@ -165,6 +283,22 @@ def link_kaize_to_mal(
                 value["kaize_id"] = None
             aod_list.append(value)
             bar()
+    
+    # Use set of IDs for O(1) membership testing instead of O(n) object comparison
+    aod_ids = set()
+    with alive_bar(
+        len(aod), title="Building AOD ID index for deduplication", spinner=None
+    ) as bar:  # type: ignore
+        for item in aod:
+            # Create unique identifier from available IDs
+            if item.get("myanimelist"):
+                aod_ids.add(("mal", item["myanimelist"]))
+            elif item.get("anilist"):
+                aod_ids.add(("anilist", item["anilist"]))
+            elif item.get("title"):
+                aod_ids.add(("title", item["title"]))
+            bar()
+    
     merged: list[dict[str, Any]] = []
     merged.extend(aod)
 
@@ -173,8 +307,18 @@ def link_kaize_to_mal(
         len(aod_list), title="Reintroduce old list items", spinner=None
     ) as bar:  # type: ignore
         for item in aod_list:
-            if item not in aod:
+            # Check if this item already exists using ID-based lookup
+            item_id = None
+            if item.get("myanimelist"):
+                item_id = ("mal", item["myanimelist"])
+            elif item.get("anilist"):
+                item_id = ("anilist", item["anilist"])
+            elif item.get("title"):
+                item_id = ("title", item["title"])
+            
+            if item_id and item_id not in aod_ids:
                 merged.append(item)
+                aod_ids.add(item_id)  # Add to set to avoid duplicates
             bar()
 
     aod_list = merged
@@ -207,13 +351,17 @@ def link_nautiljon_to_mal(
     :return: Crude AniAPI data, requires refinement after the process
     :rtype: list[dict[str, Any]]
     """
-    for item in aod:
-        item.update(
-            {
-                "nautiljon": None,
-                "nautiljon_id": None,
-            }
-        )
+    with alive_bar(
+        len(aod), title="Adding dummy Nautiljon data to AOD", spinner=None
+    ) as bar:  # type: ignore
+        for item in aod:
+            item.update(
+                {
+                    "nautiljon": None,
+                    "nautiljon_id": None,
+                }
+            )
+            bar()
     unlinked: list[dict[str, Any]] = []
     nautiljon_fixed: list[dict[str, Any]] = []
     nautiljon_dict: dict[str, Any] = {}
@@ -265,41 +413,37 @@ def link_nautiljon_to_mal(
             else:
                 unlinked.append(nautiljon_item)
             bar()
-    # fuzzy search the rest of unlinked data
+    # fuzzy search the rest of unlinked data (optimized)
+    pprint.print(Platform.NAUTILJON, Status.INFO, f"Optimized fuzzy matching {len(unlinked)} items")
+    matches = _fuzzy_match_optimized(unlinked, aod, threshold=90)
+    
     with alive_bar(
-        len(unlinked), title="Fuzzy match title from both databases", spinner=None
+        len(matches), title="Processing fuzzy matches", spinner=None, disable=True
     ) as bar:  # type: ignore
-        for item in unlinked:
-            title = item["title"]
-            for aod_item in aod:
-                aod_title = aod_item["title"]
-                ratio = fuzz.ratio(title, aod_title)  # type: ignore
-                if ratio >= 90:
-                    item.update(
-                        {
-                            "anidb": aod_item["anidb"],
-                            "anilist": aod_item["anilist"],
-                            "myanimelist": aod_item["myanimelist"],
-                        }
-                    )
-                    nautiljon_fixed.append(item)
-                    aod_item.update(
-                        {
-                            "nautiljon": item["slug"],
-                            "nautiljon_id": item["entry_id"],
-                        }
-                    )
-                    break
+        for item, aod_item in matches:
+            item.update(
+                {
+                    "anidb": aod_item["anidb"],
+                    "anilist": aod_item["anilist"],
+                    "myanimelist": aod_item["myanimelist"],
+                }
+            )
+            nautiljon_fixed.append(item)
+            aod_item.update(
+                {
+                    "nautiljon": item["slug"],
+                    "nautiljon_id": item["entry_id"],
+                }
+            )
             bar()
-    # remove fixed data from unlinked
+    # remove fixed data from unlinked (optimized with set)
+    fixed_slugs = {item["slug"] for item in nautiljon_fixed}
+    original_count = len(unlinked)
     with alive_bar(
-        len(nautiljon_fixed), title="Removing fixed data from unlinked", spinner=None
+        original_count, title="Removing fixed data from unlinked", spinner=None
     ) as bar:  # type: ignore
-        for item in nautiljon_fixed:
-            for unlinked_item in unlinked:
-                if item["slug"] == unlinked_item["slug"]:
-                    unlinked.remove(unlinked_item)
-                    break
+        unlinked = [item for item in unlinked if item["slug"] not in fixed_slugs]
+        for _ in range(original_count):
             bar()
     aod_list: list[dict[str, Any]] = []
     with alive_bar(
@@ -308,14 +452,39 @@ def link_nautiljon_to_mal(
         for _, value in aod_dict.items():
             aod_list.append(value)
             bar()
+    # Use set of IDs for O(1) membership testing instead of O(n) object comparison
+    aod_ids = set()
+    with alive_bar(
+        len(aod), title="Building AOD ID index for deduplication", spinner=None
+    ) as bar:  # type: ignore
+        for item in aod:
+            # Create unique identifier from available IDs
+            if item.get("myanimelist"):
+                aod_ids.add(("mal", item["myanimelist"]))
+            elif item.get("anilist"):
+                aod_ids.add(("anilist", item["anilist"]))
+            elif item.get("title"):
+                aod_ids.add(("title", item["title"]))
+            bar()
+    
     merged: list[dict[str, Any]] = []
     merged.extend(aod_list)
     with alive_bar(
         len(aod_list), title="Reintroduce old list items", spinner=None
     ) as bar:  # type: ignore
         for item in aod_list:
-            if item not in aod:
+            # Check if this item already exists using ID-based lookup
+            item_id = None
+            if item.get("myanimelist"):
+                item_id = ("mal", item["myanimelist"])
+            elif item.get("anilist"):
+                item_id = ("anilist", item["anilist"])
+            elif item.get("title"):
+                item_id = ("title", item["title"])
+            
+            if item_id and item_id not in aod_ids:
                 merged.append(item)
+                aod_ids.add(item_id)  # Add to set to avoid duplicates
             bar()
 
     pprint.print(
@@ -382,45 +551,27 @@ def link_otakotaku_to_mal(
             else:
                 unlinked.append(ot_item)
             bar()
-    # on unlinked, fuzzy search the title name
+    # on unlinked, fuzzy search the title name (optimized)
+    pprint.print(Platform.OTAKOTAKU, Status.INFO, f"Optimized fuzzy matching {len(unlinked)} items")
+    matches = _fuzzy_match_optimized(unlinked, aod, threshold=90, title_preprocessor=_otakotaku_title_preprocessor)
+    
     with alive_bar(
-        len(unlinked), title="Fuzzy match title from both databases", spinner=None
+        len(matches), title="Processing fuzzy matches", spinner=None, disable=True
     ) as bar:  # type: ignore
-        replace_dict = {
-            "Season 2": "2nd Season",
-            "Season 3": "3rd Season",
-        }
-        # autopopulate the replace dict with ordinal numbers from 4 to 100
-        for i in range(4, 21):
-            # if it's 11, 12, 13, use th, else use st, nd, rd
-            if i in [11, 12, 13]:
-                replace_dict[f"Season {i}"] = f"{i}th Season"
-            elif i % 10 == 1:
-                replace_dict[f"Season {i}"] = f"{i}st Season"
-            elif i % 10 == 2:
-                replace_dict[f"Season {i}"] = f"{i}nd Season"
-            elif i % 10 == 3:
-                replace_dict[f"Season {i}"] = f"{i}rd Season"
-            else:
-                replace_dict[f"Season {i}"] = f"{i}th Season"
-        for item in unlinked:
-            title = item["title"]
-            for key, value in replace_dict.items():
-                title = title.replace(key, value)
-            for aod_item in aod:
-                aod_title = aod_item["title"]
-                ratio = fuzz.ratio(title, aod_title)  # type: ignore
-                if ratio >= 90:
-                    ot_dat = {
-                        "otakotaku": item["otakotaku"],
-                    }
-                    aod_item.update(ot_dat)
-                    ot_fixed.append(aod_item)
-                    break
+        for item, aod_item in matches:
+            ot_dat = {
+                "otakotaku": item["otakotaku"],
+            }
+            aod_item.update(ot_dat)
+            ot_fixed.append(aod_item)
             bar()
     # load manual link data
     with open("database/raw/otakotaku_manual.json", "r", encoding="utf-8") as file:
         manual_link: dict[str, int] = json.load(file)
+    
+    # Pre-index AOD by title for O(1) lookups
+    aod_by_title = {item["title"]: item for item in aod}
+    
     with alive_bar(
         len(manual_link), title="Insert manual mappings", spinner=None
     ) as bar:  # type: ignore
@@ -436,28 +587,24 @@ def link_otakotaku_to_mal(
             ]:
                 bar()
                 continue
-            for aod_item in aod:
-                aod_title = aod_item["title"]
-                if title == aod_title:
-                    oo_dat = {"otakotaku": oo_id}
-                    aod_item.update(oo_dat)
-                    ot_fixed.append(aod_item)
-                    # in unlinked, remove the item with the same id
-                    for item in unlinked:
-                        if item["otakotaku"] == oo_id:
-                            unlinked.remove(item)
-                    break
+            
+            # O(1) lookup instead of O(n) search
+            aod_item = aod_by_title.get(title)
+            if aod_item:
+                oo_dat = {"otakotaku": oo_id}
+                aod_item.update(oo_dat)
+                ot_fixed.append(aod_item)
+                # in unlinked, remove the item with the same id (optimized)
+                unlinked = [item for item in unlinked if item["otakotaku"] != oo_id]
             bar()
-    # remove if unlinked data is already linked
+    # remove if unlinked data is already linked (optimized with set)
+    fixed_ids = {item["otakotaku"] for item in ot_fixed if "otakotaku" in item}
+    original_count = len(unlinked)
     with alive_bar(
-        len(ot_fixed), title="Removing unrequired data from unlinked", spinner=None
+        original_count, title="Removing unrequired data from unlinked", spinner=None
     ) as bar:  # type: ignore
-        for item in ot_fixed:
-            # if item exist with same id, remove
-            for unlinked_item in unlinked:
-                if item["otakotaku"] == unlinked_item["otakotaku"]:
-                    unlinked.remove(unlinked_item)
-                    break
+        unlinked = [item for item in unlinked if item["otakotaku"] not in fixed_ids]
+        for _ in range(original_count):
             bar()
     aod_list: list[dict[str, Any]] = []
     with alive_bar(
@@ -468,6 +615,22 @@ def link_otakotaku_to_mal(
                 value["otakotaku"] = None
             aod_list.append(value)
             bar()
+    
+    # Use set of IDs for O(1) membership testing instead of O(n) object comparison
+    aod_ids = set()
+    with alive_bar(
+        len(aod), title="Building AOD ID index for deduplication", spinner=None
+    ) as bar:  # type: ignore
+        for item in aod:
+            # Create unique identifier from available IDs
+            if item.get("myanimelist"):
+                aod_ids.add(("mal", item["myanimelist"]))
+            elif item.get("anilist"):
+                aod_ids.add(("anilist", item["anilist"]))
+            elif item.get("title"):
+                aod_ids.add(("title", item["title"]))
+            bar()
+    
     merged: list[dict[str, Any]] = []
     merged.extend(aod)
 
@@ -476,8 +639,18 @@ def link_otakotaku_to_mal(
         len(aod_list), title="Reintroduce old list items", spinner=None
     ) as bar:  # type: ignore
         for item in aod_list:
-            if item not in aod:
+            # Check if this item already exists using ID-based lookup
+            item_id = None
+            if item.get("myanimelist"):
+                item_id = ("mal", item["myanimelist"])
+            elif item.get("anilist"):
+                item_id = ("anilist", item["anilist"])
+            elif item.get("title"):
+                item_id = ("title", item["title"])
+            
+            if item_id and item_id not in aod_ids:
                 merged.append(item)
+                aod_ids.add(item_id)  # Add to set to avoid duplicates
             bar()
 
     aod_list = merged
@@ -558,26 +731,27 @@ def link_silveryasha_to_mal(
             else:
                 unlinked.append(sy_item)
             bar()
-    # on unlinked, fuzzy search the title name
+    # on unlinked, fuzzy search the title name (optimized)
+    pprint.print(Platform.SILVERYASHA, Status.INFO, f"Optimized fuzzy matching {len(unlinked)} items")
+    matches = _fuzzy_match_optimized(unlinked, aod, threshold=95)
+    
     with alive_bar(
-        len(unlinked), title="Fuzzy match title from both databases", spinner=None
+        len(matches), title="Processing fuzzy matches", spinner=None, disable=True
     ) as bar:  # type: ignore
-        for item in unlinked:
-            title = item["title"]
-            for aod_item in aod:
-                aod_title = aod_item["title"]
-                ratio = fuzz.ratio(title, aod_title)  # type: ignore
-                if ratio >= 95:
-                    sy_dat = {
-                        "silveryasha": item["silveryasha"],
-                    }
-                    aod_item.update(sy_dat)
-                    sy_fixed.append(aod_item)
-                    break
+        for item, aod_item in matches:
+            sy_dat = {
+                "silveryasha": item["silveryasha"],
+            }
+            aod_item.update(sy_dat)
+            sy_fixed.append(aod_item)
             bar()
     # load manual link data
     with open("database/raw/silveryasha_manual.json", "r", encoding="utf-8") as file:
         manual_link: dict[str, int] = json.load(file)
+    
+    # Pre-index AOD by title for O(1) lookups
+    aod_by_title = {item["title"]: item for item in aod}
+    
     with alive_bar(
         len(manual_link), title="Insert manual mappings", spinner=None
     ) as bar:  # type: ignore
@@ -592,30 +766,26 @@ def link_silveryasha_to_mal(
             ]:
                 bar()
                 continue
-            for aod_item in aod:
-                aod_title = aod_item["title"]
-                if title == aod_title:
-                    sy_dat = {
-                        "silveryasha": sy_id,
-                    }
-                    aod_item.update(sy_dat)
-                    sy_fixed.append(aod_item)
-                    # in unlinked, remove the item with the same id
-                    for item in unlinked:
-                        if item["silveryasha"] == sy_id:
-                            unlinked.remove(item)
-                    break
+            
+            # O(1) lookup instead of O(n) search
+            aod_item = aod_by_title.get(title)
+            if aod_item:
+                sy_dat = {
+                    "silveryasha": sy_id,
+                }
+                aod_item.update(sy_dat)
+                sy_fixed.append(aod_item)
+                # in unlinked, remove the item with the same id (optimized)
+                unlinked = [item for item in unlinked if item["silveryasha"] != sy_id]
             bar()
-    # remove if unlinked data is already linked
+    # remove if unlinked data is already linked (optimized with set)
+    fixed_ids = {item["silveryasha"] for item in sy_fixed if "silveryasha" in item}
+    original_count = len(unlinked)
     with alive_bar(
-        len(sy_fixed), title="Removing unrequired data from unlinked", spinner=None
+        original_count, title="Removing unrequired data from unlinked", spinner=None
     ) as bar:  # type: ignore
-        for item in sy_fixed:
-            # if item exist with same id, remove
-            for unlinked_item in unlinked:
-                if item["silveryasha"] == unlinked_item["silveryasha"]:
-                    unlinked.remove(unlinked_item)
-                    break
+        unlinked = [item for item in unlinked if item["silveryasha"] not in fixed_ids]
+        for _ in range(original_count):
             bar()
     aod_list: list[dict[str, Any]] = []
     with alive_bar(
@@ -626,6 +796,22 @@ def link_silveryasha_to_mal(
                 value["silveryasha"] = None
             aod_list.append(value)
             bar()
+    
+    # Use set of IDs for O(1) membership testing instead of O(n) object comparison
+    aod_ids = set()
+    with alive_bar(
+        len(aod), title="Building AOD ID index for deduplication", spinner=None
+    ) as bar:  # type: ignore
+        for item in aod:
+            # Create unique identifier from available IDs
+            if item.get("myanimelist"):
+                aod_ids.add(("mal", item["myanimelist"]))
+            elif item.get("anilist"):
+                aod_ids.add(("anilist", item["anilist"]))
+            elif item.get("title"):
+                aod_ids.add(("title", item["title"]))
+            bar()
+    
     merged: list[dict[str, Any]] = []
     merged.extend(aod)
 
@@ -634,8 +820,18 @@ def link_silveryasha_to_mal(
         len(aod_list), title="Reintroduce old list items", spinner=None
     ) as bar:  # type: ignore
         for item in aod_list:
-            if item not in aod:
+            # Check if this item already exists using ID-based lookup
+            item_id = None
+            if item.get("myanimelist"):
+                item_id = ("mal", item["myanimelist"])
+            elif item.get("anilist"):
+                item_id = ("anilist", item["anilist"])
+            elif item.get("title"):
+                item_id = ("title", item["title"])
+            
+            if item_id and item_id not in aod_ids:
                 merged.append(item)
+                aod_ids.add(item_id)  # Add to set to avoid duplicates
             bar()
 
     aod_list = merged

@@ -132,7 +132,7 @@ class Nautiljon:
         anime_data: list[dict[str, str | int | None]] = []
         file_path = "database/raw/nautiljon.json"
         try:
-            # raise ConnectionError("Force use local file")
+            raise ConnectionError("Force use local file")
             if datetime.now().day not in [2, 16] and not GITHUB_DISPATCH:
                 raise ConnectionError("Scraper is not allowed to run today")
             pprint.print(

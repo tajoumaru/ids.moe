@@ -34,6 +34,7 @@ from nautiljon import Nautiljon
 from otakotaku import OtakOtaku
 from prettyprint import Platform, Status
 from utils import check_git_any_changes, proc_stop
+from kv_ingest import ingest_to_kv_store
 
 # if (KAIZE_XSRF_TOKEN is None) and (KAIZE_SESSION is None) and (KAIZE_EMAIL is None) and (KAIZE_PASSWORD is None):
 #     raise Exception('Kaize login info does not available in environment variables')
@@ -41,10 +42,13 @@ from utils import check_git_any_changes, proc_stop
 
 def main() -> None:
     """Main function"""
+    print("=== MAIN FUNCTION STARTED ===")
     start_time = time()
     try:
         pprint.print(Platform.SYSTEM, Status.READY, "Generator ready to use")
+        pprint.print(Platform.SYSTEM, Status.INFO, "Getting AOD data...")
         aod = get_anime_offline_database()
+        pprint.print(Platform.SYSTEM, Status.INFO, "Simplifying AOD data...")
         aod_arr = simplify_aod_data(aod)
         kza = Kaize(
             session=KAIZE_SESSION,
@@ -130,17 +134,44 @@ def main() -> None:
                 }
                 final_arr.append(data)
                 bar()
-        with open("database/animeapi.json", "w", encoding="utf-8") as file:
-            json.dump(final_arr, file)
-
-        attr = update_attribution(final_arr, attribution)
-        attr = update_markdown(attr=attr)
-        counts: dict[str, int] = attr["counts"]  # type: ignore
-        print("Data parsed:")
-        for key, value in counts.items():
-            if key == "total":
-                continue
-            print(f"* {key}: {value}")
+        # Debug: Count total platform keys before KV ingestion
+        total_platform_keys = 0
+        for item in final_arr:
+            # Count non-null platform values (same logic as KV ingestion)
+            platform_count = 0
+            simple_platforms = [
+                "anidb", "anilist", "animenewsnetwork", "animeplanet", "anisearch", 
+                "annict", "imdb", "kitsu", "livechart", "myanimelist", "notify", 
+                "otakotaku", "shikimori", "shoboi", "silveryasha", "simkl"
+            ]
+            for platform in simple_platforms:
+                if item.get(platform) is not None:
+                    platform_count += 1
+            
+            # Count special platforms
+            if item.get("kaize") is not None:
+                platform_count += 1
+            if item.get("kaize_id") is not None:
+                platform_count += 1
+            if item.get("nautiljon") is not None:
+                platform_count += 1
+            if item.get("nautiljon_id") is not None:
+                platform_count += 1
+            if item.get("trakt") is not None and item.get("trakt_type") is not None:
+                platform_count += 1  # Base trakt key
+                if item.get("trakt_season") is not None:
+                    platform_count += 1  # Season-specific key
+            if item.get("themoviedb") is not None:
+                platform_count += 1
+                
+            total_platform_keys += platform_count
+        
+        pprint.print(Platform.SYSTEM, Status.INFO, f"Pre-KV count: {total_platform_keys} platform keys from {len(final_arr)} anime")
+        pprint.print(Platform.SYSTEM, Status.INFO, f"Expected total with data keys: {total_platform_keys + len(final_arr)}")
+        pprint.print(Platform.SYSTEM, Status.INFO, "Ingesting data to KV store")
+        ingest_to_kv_store(final_arr)
+        
+        pprint.print(Platform.SYSTEM, Status.PASS, f"Generator completed! Processed {len(final_arr)} anime entries")
         proc_stop(start_time, Status.INFO)
     except KeyboardInterrupt:
         proc_stop(start_time, Status.ERR, "Stopped by user", 1)

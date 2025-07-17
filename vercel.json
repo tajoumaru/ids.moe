@@ -1,8 +1,16 @@
 {
+    "functions": {
+        "api/index.go": {
+            "runtime": "@vercel/go"
+        }
+    },
     "rewrites": [
         {
             "source": "/(.*)",
             "destination": "/api/index"
         }
-    ]
+    ],
+    "env": {
+        "REDIS_URL": "@redis_url"
+    }
 }

@@ -59,9 +59,12 @@ class Downloader:
         if not self.scrape:
             pprint.print(self.platform, Status.ERR, "Failed to create cloudscraper")
             return None
+        # Force use of local files
+        pprint.print(self.platform, Status.INFO, "Forcing local file usage")
+        return None
         response = self.scrape.get(self.url, timeout=None)
         try:
-            # raise ConnectionError("Force use local file")
+            raise ConnectionError("Force use local file")
             if response.status_code != 200:
                 raise ConnectionError(
                     f"{response.status_code}",
@@ -114,10 +117,10 @@ class Downloader:
         :rtype: Any
         """
         try:
+            filename = f"database/raw/{self.file_name}.json"
+            print(f"DEBUG: Trying to load {filename}")
             if self.file_type == "json":
-                with open(
-                    f"database/raw/{self.file_name}.json", "r", encoding="utf-8"
-                ) as file:
+                with open(filename, "r", encoding="utf-8") as file:
                     return json.load(file)
             else:
                 with open(
@@ -125,10 +128,11 @@ class Downloader:
                 ) as file:
                     return file.read()
         # file not found
-        except FileNotFoundError:
+        except Exception as e:
+            print(f"DEBUG: Error loading file: {e}")
             pprint.print(
                 self.platform,
                 Status.ERR,
-                "Failed to load data, please download the data first, or check your internet connection",
+                f"Failed to load data: {e}",
             )
             raise SystemExit
