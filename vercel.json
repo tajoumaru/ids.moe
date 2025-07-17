@@ -9,8 +9,5 @@
             "source": "/(.*)",
             "destination": "/api/index"
         }
-    ],
-    "env": {
-        "REDIS_URL": "@redis_url"
-    }
+    ]
 }
