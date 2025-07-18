@@ -1,12 +1,11 @@
 """
-Database operations using SQLAlchemy ORM with asyncpg for better performance.
-Implements bulk operations and proper transaction handling with PostgreSQL.
+Database operations using SQLAlchemy ORM with PostgreSQL.
+Implements bulk operations and proper transaction handling.
 """
 
-import asyncio
 from typing import List, Dict, Tuple
-from sqlalchemy import select, update, delete, func
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import create_engine, Engine, select, update, delete, func
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from dataclasses import asdict
 
@@ -29,30 +28,32 @@ class ChangeSet:
         return len(self.inserts) + len(self.updates) + len(self.deletes)
 
 
-class AsyncSQLAlchemyOperations:
-    """High-performance async database operations using SQLAlchemy ORM with PostgreSQL."""
+class SQLAlchemyOperations:
+    """High-performance database operations using SQLAlchemy ORM with PostgreSQL."""
 
-    def __init__(self, db_url: str = DATABASE_URL):
-        """Initialize with database URL."""
-        self.db_url = db_url
-        self.engine = create_async_engine(
-            db_url,
+    def __init__(self, db_path: str = DATABASE_URL):
+        """Initialize with database path."""
+        self.db_path = db_path
+        self.engine = self._create_engine()
+        self.Session = sessionmaker(bind=self.engine)
+        self._create_tables()
+
+    def _create_engine(self) -> Engine:
+        """Create SQLAlchemy engine with PostgreSQL."""
+        return create_engine(
+            self.db_path,
             echo=False,  # Set to True for SQL debugging
             pool_pre_ping=True,
             pool_recycle=3600,  # Recycle connections every hour
             pool_size=10,  # Connection pool size
             max_overflow=20,  # Maximum overflow connections
         )
-        self.async_session = async_sessionmaker(
-            self.engine, class_=AsyncSession, expire_on_commit=False
-        )
 
-    async def create_tables(self) -> None:
+    def _create_tables(self) -> None:
         """Create all database tables."""
-        async with self.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        Base.metadata.create_all(self.engine)
 
-    async def detect_changes(self, new_records: List[AnimeRecord]) -> ChangeSet:
+    def detect_changes(self, new_records: List[AnimeRecord]) -> ChangeSet:
         """Detect changes between new records and existing database."""
         pprint.print(
             Platform.SYSTEM, Status.INFO, "Detecting changes in anime records..."
@@ -60,12 +61,11 @@ class AsyncSQLAlchemyOperations:
 
         changeset = ChangeSet()
 
-        async with self.async_session() as session:
+        with self.Session() as session:
             # Get existing records from database
-            result = await session.execute(
+            existing_records = session.execute(
                 select(Anime.id, Anime.title, Anime.myanimelist, Anime.data_hash)
-            )
-            existing_records = result.all()
+            ).all()
 
             existing_by_mal = {
                 r.myanimelist: r for r in existing_records if r.myanimelist
@@ -123,7 +123,7 @@ class AsyncSQLAlchemyOperations:
         )
         return changeset
 
-    async def apply_changes(self, changeset: ChangeSet) -> None:
+    def apply_changes(self, changeset: ChangeSet) -> None:
         """Apply changes to the database using efficient bulk operations."""
         if changeset.total_changes() == 0:
             pprint.print(Platform.SYSTEM, Status.INFO, "No changes to apply")
@@ -135,41 +135,41 @@ class AsyncSQLAlchemyOperations:
             f"Applying {changeset.total_changes()} changes to database...",
         )
 
-        async with self.async_session() as session:
+        with self.Session() as session:
             try:
                 # Apply bulk inserts
                 if changeset.inserts:
-                    anime_ids = await self._bulk_insert_anime_records(
+                    anime_ids = self._bulk_insert_anime_records(
                         session, changeset.inserts
                     )
-                    await self._bulk_log_changes(session, anime_ids, "insert")
+                    self._bulk_log_changes(session, anime_ids, "insert")
 
                 # Apply bulk updates
                 if changeset.updates:
-                    await self._bulk_update_anime_records(session, changeset.updates)
+                    self._bulk_update_anime_records(session, changeset.updates)
                     anime_ids = [anime_id for anime_id, _ in changeset.updates]
-                    await self._bulk_log_changes(session, anime_ids, "update")
+                    self._bulk_log_changes(session, anime_ids, "update")
 
                 # Apply bulk deletes
                 if changeset.deletes:
-                    await self._bulk_delete_anime_records(session, changeset.deletes)
-                    await self._bulk_log_changes(session, changeset.deletes, "delete")
+                    self._bulk_delete_anime_records(session, changeset.deletes)
+                    self._bulk_log_changes(session, changeset.deletes, "delete")
 
                 # Commit all changes
-                await session.commit()
+                session.commit()
                 pprint.print(
                     Platform.SYSTEM, Status.PASS, "Changes applied successfully"
                 )
 
             except Exception as e:
-                await session.rollback()
+                session.rollback()
                 pprint.print(
                     Platform.SYSTEM, Status.FAIL, f"Failed to apply changes: {e}"
                 )
                 raise
 
-    async def _bulk_insert_anime_records(
-        self, session: AsyncSession, records: List[AnimeRecord]
+    def _bulk_insert_anime_records(
+        self, session: Session, records: List[AnimeRecord]
     ) -> List[int]:
         """Insert multiple anime records using PostgreSQL bulk operations."""
         if not records:
@@ -194,7 +194,7 @@ class AsyncSQLAlchemyOperations:
 
             # Use PostgreSQL-specific bulk insert with RETURNING
             stmt = pg_insert(Anime).values(record_dicts)
-            result = await session.execute(stmt.returning(Anime.id))
+            result = session.execute(stmt.returning(Anime.id))
 
             # Get the inserted IDs
             anime_ids = [row[0] for row in result]
@@ -210,8 +210,8 @@ class AsyncSQLAlchemyOperations:
 
         return all_anime_ids
 
-    async def _bulk_update_anime_records(
-        self, session: AsyncSession, updates: List[Tuple[int, AnimeRecord]]
+    def _bulk_update_anime_records(
+        self, session: Session, updates: List[Tuple[int, AnimeRecord]]
     ) -> None:
         """Update multiple anime records using PostgreSQL bulk operations."""
         if not updates:
@@ -236,7 +236,7 @@ class AsyncSQLAlchemyOperations:
             if update_values:
                 # Use PostgreSQL-specific bulk update with VALUES clause
                 stmt = update(Anime)
-                await session.execute(stmt, update_values)
+                session.execute(stmt, update_values)
 
             # Log progress for large batches
             if len(updates) > BATCH_SIZE:
@@ -246,8 +246,8 @@ class AsyncSQLAlchemyOperations:
                     f"Updated batch {i // BATCH_SIZE + 1}/{(len(updates) + BATCH_SIZE - 1) // BATCH_SIZE}",
                 )
 
-    async def _bulk_delete_anime_records(
-        self, session: AsyncSession, anime_ids: List[int]
+    def _bulk_delete_anime_records(
+        self, session: Session, anime_ids: List[int]
     ) -> None:
         """Delete multiple anime records using PostgreSQL bulk operations."""
         if not anime_ids:
@@ -262,7 +262,7 @@ class AsyncSQLAlchemyOperations:
 
             # Use bulk delete with IN clause
             stmt = delete(Anime).where(Anime.id.in_(batch))
-            await session.execute(stmt)
+            session.execute(stmt)
 
             # Log progress for large batches
             if len(anime_ids) > BATCH_SIZE:
@@ -272,8 +272,8 @@ class AsyncSQLAlchemyOperations:
                     f"Deleted batch {i // BATCH_SIZE + 1}/{(len(anime_ids) + BATCH_SIZE - 1) // BATCH_SIZE}",
                 )
 
-    async def _bulk_log_changes(
-        self, session: AsyncSession, anime_ids: List[int], change_type: str
+    def _bulk_log_changes(
+        self, session: Session, anime_ids: List[int], change_type: str
     ) -> None:
         """Log multiple changes for KV sync."""
         if not anime_ids:
@@ -293,7 +293,7 @@ class AsyncSQLAlchemyOperations:
 
             # Use PostgreSQL bulk insert for change logs
             stmt = pg_insert(ChangeLog).values(change_logs)
-            await session.execute(stmt)
+            session.execute(stmt)
 
             # Log progress for large batches
             if len(anime_ids) > BATCH_SIZE:
@@ -303,10 +303,10 @@ class AsyncSQLAlchemyOperations:
                     f"Logged {change_type} changes batch {i // BATCH_SIZE + 1}/{(len(anime_ids) + BATCH_SIZE - 1) // BATCH_SIZE}",
                 )
 
-    async def get_manual_mappings(self, platform: str) -> Dict[str, str]:
+    def get_manual_mappings(self, platform: str) -> Dict[str, str]:
         """Get manual mappings for a platform."""
-        async with self.async_session() as session:
-            result = await session.execute(
+        with self.Session() as session:
+            result = session.execute(
                 select(ManualMapping.platform_id, ManualMapping.platform_slug).where(
                     ManualMapping.platform == platform
                 )
@@ -318,17 +318,17 @@ class AsyncSQLAlchemyOperations:
                 for mapping in mappings
             }
 
-    async def get_anime_count(self) -> int:
+    def get_anime_count(self) -> int:
         """Get total count of anime records."""
-        async with self.async_session() as session:
-            result = await session.execute(select(func.count(Anime.id)))
+        with self.Session() as session:
+            result = session.execute(select(func.count(Anime.id)))
             count = result.scalar()
             return count or 0
 
-    async def get_pending_changes(self) -> List[ChangeLog]:
+    def get_pending_changes(self) -> List[ChangeLog]:
         """Get unprocessed change log entries."""
-        async with self.async_session() as session:
-            result = await session.execute(
+        with self.Session() as session:
+            result = session.execute(
                 select(ChangeLog)
                 .where(ChangeLog.processed.is_(False))
                 .order_by(ChangeLog.created_at)
@@ -337,14 +337,14 @@ class AsyncSQLAlchemyOperations:
 
             return list(changes)
 
-    async def get_all_anime_records(self) -> List[Anime]:
+    def get_all_anime_records(self) -> List[Anime]:
         """Get all anime records from the database."""
-        async with self.async_session() as session:
-            result = await session.execute(select(Anime))
+        with self.Session() as session:
+            result = session.execute(select(Anime))
             records = result.scalars().all()
             return list(records)
 
-    async def mark_changes_processed(self, change_ids: List[int]) -> None:
+    def mark_changes_processed(self, change_ids: List[int]) -> None:
         """Mark change log entries as processed."""
         if not change_ids:
             return
@@ -352,7 +352,7 @@ class AsyncSQLAlchemyOperations:
         # PostgreSQL can handle larger batches
         BATCH_SIZE = 1000
 
-        async with self.async_session() as session:
+        with self.Session() as session:
             for i in range(0, len(change_ids), BATCH_SIZE):
                 batch = change_ids[i : i + BATCH_SIZE]
                 stmt = (
@@ -360,20 +360,20 @@ class AsyncSQLAlchemyOperations:
                     .where(ChangeLog.id.in_(batch))
                     .values(processed=True, processed_at=func.now())
                 )
-                await session.execute(stmt)
-            await session.commit()
+                session.execute(stmt)
+            session.commit()
 
-    async def get_platform_count(self, platform: str) -> int:
+    def get_platform_count(self, platform: str) -> int:
         """Get count of non-null entries for a specific platform."""
         try:
-            async with self.async_session() as session:
+            with self.Session() as session:
                 # Get the column by name
                 column = getattr(Anime, platform, None)
                 if column is None:
                     return 0
 
                 # Count non-null entries
-                result = await session.execute(
+                result = session.execute(
                     select(func.count(column)).filter(column.is_not(None))
                 )
                 count = result.scalar()
@@ -385,65 +385,6 @@ class AsyncSQLAlchemyOperations:
             )
             return 0
 
-    async def close(self) -> None:
-        """Close database connection."""
-        await self.engine.dispose()
-
-
-# Compatibility wrapper for synchronous code
-class SQLAlchemyOperations:
-    """Synchronous wrapper for AsyncSQLAlchemyOperations to maintain compatibility."""
-
-    def __init__(self, db_path: str = DATABASE_URL):
-        """Initialize with database path."""
-        self.async_ops = AsyncSQLAlchemyOperations(db_path)
-
-    def _run_async(self, coro):
-        """Helper to run async coroutines in sync context."""
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        return loop.run_until_complete(coro)
-
-    def _create_tables(self) -> None:
-        """Create all database tables."""
-        self._run_async(self.async_ops.create_tables())
-
-    def detect_changes(self, new_records: List[AnimeRecord]) -> ChangeSet:
-        """Detect changes between new records and existing database."""
-        return self._run_async(self.async_ops.detect_changes(new_records))
-
-    def apply_changes(self, changeset: ChangeSet) -> None:
-        """Apply changes to the database using efficient bulk operations."""
-        self._run_async(self.async_ops.apply_changes(changeset))
-
-    def get_manual_mappings(self, platform: str) -> Dict[str, str]:
-        """Get manual mappings for a platform."""
-        return self._run_async(self.async_ops.get_manual_mappings(platform))
-
-    def get_anime_count(self) -> int:
-        """Get total count of anime records."""
-        return self._run_async(self.async_ops.get_anime_count())
-
-    def get_pending_changes(self) -> List[ChangeLog]:
-        """Get unprocessed change log entries."""
-        return self._run_async(self.async_ops.get_pending_changes())
-
-    def get_all_anime_records(self) -> List[Anime]:
-        """Get all anime records from the database."""
-        return self._run_async(self.async_ops.get_all_anime_records())
-
-    def mark_changes_processed(self, change_ids: List[int]) -> None:
-        """Mark change log entries as processed."""
-        self._run_async(self.async_ops.mark_changes_processed(change_ids))
-
-    def get_platform_count(self, platform: str) -> int:
-        """Get count of non-null entries for a specific platform."""
-        return self._run_async(self.async_ops.get_platform_count(platform))
-
     def close(self) -> None:
         """Close database connection."""
-        self._run_async(self.async_ops.close())
+        self.engine.dispose()
