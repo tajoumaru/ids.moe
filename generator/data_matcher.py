@@ -383,32 +383,18 @@ class DataMatcher:
         unlinked = []
 
         # Process each SilverYasha item
-        for i, sy_item in enumerate(silveryasha_data):
-            if i % 1000 == 0:
-                pprint.print(
-                    Platform.SILVERYASHA,
-                    Status.INFO,
-                    f"Processed {i}/{len(silveryasha_data)} items",
-                )
-
+        for sy_item in silveryasha_data:
             mal_id = sy_item.get("mal_id")
             matched = False
 
             # Try MAL ID match first
             if mal_id:
-                try:
-                    mal_id_int = int(mal_id)
-                    if mal_id_int in mal_lookup:
-                        record = mal_lookup[mal_id_int]
-                        record.silveryasha = sy_item["id"]
-                        linked += 1
-                        matched = True
-                except (ValueError, TypeError) as e:
-                    pprint.print(
-                        Platform.SILVERYASHA,
-                        Status.WARN,
-                        f"Invalid mal_id '{mal_id}' for item {sy_item.get('title', 'unknown')}: {e}",
-                    )
+                mal_id_int = int(mal_id)
+                if mal_id_int in mal_lookup:
+                    record = mal_lookup[mal_id_int]
+                    record.silveryasha = sy_item["id"]
+                    linked += 1
+                    matched = True
             # Try title match
             elif sy_item["title"] in title_lookup:
                 record = title_lookup[sy_item["title"]]
@@ -419,12 +405,6 @@ class DataMatcher:
             if not matched:
                 unlinked.append(sy_item)
 
-        pprint.print(
-            Platform.SILVERYASHA,
-            Status.INFO,
-            f"Finished processing items. Linked: {linked}, Unlinked: {len(unlinked)}",
-        )
-
         # Fuzzy match unlinked items
         if unlinked:
             pprint.print(
@@ -432,7 +412,7 @@ class DataMatcher:
                 Status.INFO,
                 f"Starting fuzzy matching for {len(unlinked)} unlinked items",
             )
-            matches = self._fuzzy_match_parallel(unlinked, records, threshold=95)
+            matches = self._fuzzy_match_parallel(unlinked, records, threshold=95, platform="silveryasha")
 
             pprint.print(
                 Platform.SILVERYASHA,
@@ -501,25 +481,50 @@ class DataMatcher:
         records: List[AnimeRecord],
         threshold: int = 85,
         title_preprocessor=None,
+        platform=None,
     ) -> List[Tuple[Dict, AnimeRecord]]:
         """Parallelized fuzzy matching using multiprocessing."""
+        if platform == "silveryasha":
+            pprint.print(
+                Platform.SYSTEM,
+                Status.INFO,
+                f"Starting fuzzy match with {len(unlinked_items)} items, {len(records)} records, threshold={threshold}",
+            )
+        
         # Convert records to dicts for multiprocessing
+        if platform == "silveryasha":
+            pprint.print(Platform.SYSTEM, Status.INFO, "Converting records to dicts...")
         record_dicts = [asdict(r) for r in records]
+        if platform == "silveryasha":
+            pprint.print(Platform.SYSTEM, Status.INFO, f"Converted {len(record_dicts)} records")
 
         # Prepare arguments
+        if platform == "silveryasha":
+            pprint.print(Platform.SYSTEM, Status.INFO, "Preparing arguments...")
         args_list = [
             (item, record_dicts, threshold, title_preprocessor)
             for item in unlinked_items
         ]
+        if platform == "silveryasha":
+            pprint.print(Platform.SYSTEM, Status.INFO, f"Prepared {len(args_list)} argument sets")
 
         # Use multiprocessing
         num_processes = cpu_count()
         matches = []
+        
+        if platform == "silveryasha":
+            pprint.print(Platform.SYSTEM, Status.INFO, f"Starting multiprocessing with {num_processes} processes...")
 
         with Pool(processes=num_processes) as pool:
+            if platform == "silveryasha":
+                pprint.print(Platform.SYSTEM, Status.INFO, "Pool created, starting map operation...")
             results = pool.map(self._fuzzy_match_single, args_list)
+            if platform == "silveryasha":
+                pprint.print(Platform.SYSTEM, Status.INFO, f"Map operation completed, got {len(results)} results")
 
             # Convert back to record objects
+            if platform == "silveryasha":
+                pprint.print(Platform.SYSTEM, Status.INFO, "Converting results back to record objects...")
             for result in results:
                 if result:
                     item, record_dict = result
@@ -528,6 +533,9 @@ class DataMatcher:
                         if record.title == record_dict["title"]:
                             matches.append((item, record))
                             break
+            
+            if platform == "silveryasha":
+                pprint.print(Platform.SYSTEM, Status.INFO, f"Finished processing results, found {len(matches)} matches")
 
         return matches
 
