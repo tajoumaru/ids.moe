@@ -186,7 +186,8 @@ class SQLAlchemyOperations:
 
         # Get all column names from the Anime model, excluding auto-generated columns
         anime_columns = [
-            col.name for col in Anime.__table__.columns 
+            col.name
+            for col in Anime.__table__.columns
             if col.name not in ("id", "created_at", "updated_at")
         ]
 
