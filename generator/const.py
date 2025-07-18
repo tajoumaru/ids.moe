@@ -45,37 +45,10 @@ def process_database_url(url: str | None = None) -> str:
 
     # Convert postgresql:// to postgresql+asyncpg:// for SQLAlchemy async
     import re
-    from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
-    # Convert postgresql:// to postgresql+asyncpg://
-    processed_url = re.sub(r"^postgresql:", "postgresql+asyncpg:", url)
-
-    # Parse the URL to handle SSL parameters
-    parsed = urlparse(processed_url)
-
-    # Extract query parameters
-    query_params = parse_qs(parsed.query)
-
-    # Convert sslmode to ssl parameter that asyncpg understands
-    if "sslmode" in query_params:
-        sslmode = query_params["sslmode"][0]
-        # Remove sslmode from query params
-        del query_params["sslmode"]
-
-        # Map sslmode values to asyncpg ssl parameter
-        if sslmode in ["require", "verify-ca", "verify-full"]:
-            query_params["ssl"] = ["true"]
-        elif sslmode == "disable":
-            query_params["ssl"] = ["false"]
-        # For 'prefer' and 'allow', we don't set ssl parameter (let asyncpg decide)
-
-    # Rebuild the query string
-    new_query = urlencode(query_params, doseq=True)
-
-    # Reconstruct the URL
-    new_parsed = parsed._replace(query=new_query)
-
-    return str(urlunparse(new_parsed))
+    # Simply convert the protocol, keep all parameters as-is
+    # asyncpg supports sslmode parameter directly
+    return re.sub(r"^postgresql:", "postgresql+asyncpg:", url)
 
 
 # Process the URL
