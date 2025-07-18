@@ -200,9 +200,9 @@ class SQLAlchemyOperations:
                         clean_dict[k] = v
                 record_dicts.append(clean_dict)
 
-            # Use standard SQLAlchemy bulk insert with RETURNING
-            stmt = insert(Anime).values(record_dicts)
-            result = session.execute(stmt.returning(Anime.id))
+            # Use SQLAlchemy 2.0 recommended approach for bulk insert
+            stmt = insert(Anime).returning(Anime.id)
+            result = session.execute(stmt, record_dicts)
 
             # Get the inserted IDs
             anime_ids = [row[0] for row in result]
@@ -308,9 +308,9 @@ class SQLAlchemyOperations:
                 {"anime_id": anime_id, "change_type": change_type} for anime_id in batch
             ]
 
-            # Use standard SQLAlchemy bulk insert for change logs
-            stmt = insert(ChangeLog).values(change_logs)
-            session.execute(stmt)
+            # Use SQLAlchemy 2.0 recommended approach for bulk insert
+            stmt = insert(ChangeLog)
+            session.execute(stmt, change_logs)
 
             # Log progress for large batches
             if len(anime_ids) > BATCH_SIZE:
