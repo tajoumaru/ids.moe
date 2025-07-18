@@ -229,21 +229,21 @@ class SQLAlchemyOperations:
         for i in range(0, len(records), BATCH_SIZE):
             batch = records[i : i + BATCH_SIZE]
 
-            # Convert AnimeRecord objects to Anime ORM objects
-            anime_objects = []
+            # Convert AnimeRecord objects to dicts for bulk insert
+            record_dicts = []
             for record in batch:
                 record_dict = asdict(record)
                 # Remove None values to use database defaults
                 record_dict = {k: v for k, v in record_dict.items() if v is not None}
-                anime_obj = Anime(**record_dict)
-                anime_objects.append(anime_obj)
+                record_dicts.append(record_dict)
 
-            # Use add_all for bulk insert
-            session.add_all(anime_objects)
-            session.flush()  # Ensure inserts are executed
+            # Use modern SQLAlchemy 2.0 bulk insert with RETURNING
+            from sqlalchemy import insert
+
+            result = session.execute(insert(Anime).returning(Anime.id), record_dicts)
 
             # Get the inserted IDs
-            anime_ids = [obj.id for obj in anime_objects]
+            anime_ids = [row[0] for row in result]
             all_anime_ids.extend(anime_ids)
 
             # Log progress for large batches
@@ -266,33 +266,27 @@ class SQLAlchemyOperations:
         # Batch updates to avoid "too many SQL variables" error
         BATCH_SIZE = 999
 
-        from sqlalchemy import bindparam
-
         # Process updates in batches
         for i in range(0, len(updates), BATCH_SIZE):
             batch = updates[i : i + BATCH_SIZE]
 
-            # Prepare update data
+            # Prepare update data with primary keys
             update_values = []
             for anime_id, record in batch:
                 record_dict = asdict(record)
                 record_dict["id"] = anime_id  # Include the primary key for bulk update
-                record_dict["b_id"] = (
-                    anime_id  # Bind parameter name (different from column name)
-                )
+                # Remove None values to use database defaults
+                record_dict = {k: v for k, v in record_dict.items() if v is not None}
                 update_values.append(record_dict)
 
             if update_values:
-                # Build update statement with bound parameters
-                stmt = update(Anime).where(Anime.id == bindparam("b_id"))
+                # Use modern SQLAlchemy 2.0 bulk update by primary key
+                from sqlalchemy import update
 
-                # Execute bulk update with synchronize_session=False
                 session.execute(
-                    stmt,
+                    update(Anime),
                     update_values,
-                    execution_options={"synchronize_session": False},
                 )
-                session.flush()
 
             # Log progress for large batches
             if len(updates) > BATCH_SIZE:

@@ -181,6 +181,7 @@ class PrettyPrint:
         print(
             f"{anullen}{cr_}{self._format_date()}{self._format_to_hex(platform)} {self._format_to_hex(status)} {message}",
             end=end,
+            flush=True,
         )
 
 
