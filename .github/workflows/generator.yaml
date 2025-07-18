@@ -32,6 +32,15 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Cache generator data
+        uses: actions/cache@v4
+        with:
+          path: cache
+          key: generator-cache-${{ hashFiles('generator/cache_downloader.py') }}-${{ github.run_number }}
+          restore-keys: |
+            generator-cache-${{ hashFiles('generator/cache_downloader.py') }}-
+            generator-cache-
+
       - name: Run Generator (Auto-installs dependencies)
         run: uv run generator
         env:
