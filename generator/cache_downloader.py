@@ -447,12 +447,14 @@ class CacheDownloader:
 
         result = cursor.fetchone()
         if result is None:
+            pprint.print(Platform.SYSTEM, Status.INFO, f"No cache entry for {scraper_name}")
             return True  # No cache entry, should run
 
         expires_at = result[0]
         if expires_at:
             expiry_time = datetime.fromisoformat(expires_at)
             if datetime.now() > expiry_time:
+                pprint.print(Platform.SYSTEM, Status.INFO, f"Cache expired for {scraper_name}")
                 return True  # Cache expired, should run
 
         return False  # Cache is still valid
