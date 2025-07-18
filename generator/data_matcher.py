@@ -412,7 +412,9 @@ class DataMatcher:
                 Status.INFO,
                 f"Starting fuzzy matching for {len(unlinked)} unlinked items",
             )
-            matches = self._fuzzy_match_parallel(unlinked, records, threshold=95, platform="silveryasha")
+            matches = self._fuzzy_match_parallel(
+                unlinked, records, threshold=95, platform="silveryasha"
+            )
 
             pprint.print(
                 Platform.SILVERYASHA,
@@ -490,13 +492,15 @@ class DataMatcher:
                 Status.INFO,
                 f"Starting fuzzy match with {len(unlinked_items)} items, {len(records)} records, threshold={threshold}",
             )
-        
+
         # Convert records to dicts for multiprocessing
         if platform == "silveryasha":
             pprint.print(Platform.SYSTEM, Status.INFO, "Converting records to dicts...")
         record_dicts = [asdict(r) for r in records]
         if platform == "silveryasha":
-            pprint.print(Platform.SYSTEM, Status.INFO, f"Converted {len(record_dicts)} records")
+            pprint.print(
+                Platform.SYSTEM, Status.INFO, f"Converted {len(record_dicts)} records"
+            )
 
         # Prepare arguments
         if platform == "silveryasha":
@@ -506,25 +510,43 @@ class DataMatcher:
             for item in unlinked_items
         ]
         if platform == "silveryasha":
-            pprint.print(Platform.SYSTEM, Status.INFO, f"Prepared {len(args_list)} argument sets")
+            pprint.print(
+                Platform.SYSTEM, Status.INFO, f"Prepared {len(args_list)} argument sets"
+            )
 
         # Use multiprocessing
         num_processes = cpu_count()
         matches = []
-        
+
         if platform == "silveryasha":
-            pprint.print(Platform.SYSTEM, Status.INFO, f"Starting multiprocessing with {num_processes} processes...")
+            pprint.print(
+                Platform.SYSTEM,
+                Status.INFO,
+                f"Starting multiprocessing with {num_processes} processes...",
+            )
 
         with Pool(processes=num_processes) as pool:
             if platform == "silveryasha":
-                pprint.print(Platform.SYSTEM, Status.INFO, "Pool created, starting map operation...")
+                pprint.print(
+                    Platform.SYSTEM,
+                    Status.INFO,
+                    "Pool created, starting map operation...",
+                )
             results = pool.map(self._fuzzy_match_single, args_list)
             if platform == "silveryasha":
-                pprint.print(Platform.SYSTEM, Status.INFO, f"Map operation completed, got {len(results)} results")
+                pprint.print(
+                    Platform.SYSTEM,
+                    Status.INFO,
+                    f"Map operation completed, got {len(results)} results",
+                )
 
             # Convert back to record objects
             if platform == "silveryasha":
-                pprint.print(Platform.SYSTEM, Status.INFO, "Converting results back to record objects...")
+                pprint.print(
+                    Platform.SYSTEM,
+                    Status.INFO,
+                    "Converting results back to record objects...",
+                )
             for result in results:
                 if result:
                     item, record_dict = result
@@ -533,9 +555,13 @@ class DataMatcher:
                         if record.title == record_dict["title"]:
                             matches.append((item, record))
                             break
-            
+
             if platform == "silveryasha":
-                pprint.print(Platform.SYSTEM, Status.INFO, f"Finished processing results, found {len(matches)} matches")
+                pprint.print(
+                    Platform.SYSTEM,
+                    Status.INFO,
+                    f"Finished processing results, found {len(matches)} matches",
+                )
 
         return matches
 
