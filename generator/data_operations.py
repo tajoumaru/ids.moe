@@ -218,10 +218,7 @@ class SQLAlchemyOperations:
         # Create TSV data in memory
         tsv_data = io.StringIO()
 
-        # Write header
-        tsv_data.write("\t".join(anime_columns) + "\n")
-
-        # Write data rows
+        # Write data rows (no header for COPY FROM)
         for record_dict in record_dicts:
             row_values = []
             for col_name in anime_columns:
