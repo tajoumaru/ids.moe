@@ -60,9 +60,9 @@ class Anime(Base):
 
     # Internal tracking
     data_hash: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=func.now(), onupdate=func.now()
+        DateTime, server_default=func.now(), onupdate=func.now()
     )
 
     def __repr__(self) -> str:
@@ -79,7 +79,7 @@ class DownloadCache(Base):
     source_url: Mapped[str] = mapped_column(Text, nullable=False)
     file_path: Mapped[str] = mapped_column(Text, nullable=False)
     file_hash: Mapped[str] = mapped_column(Text, nullable=False)
-    downloaded_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    downloaded_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     file_metadata: Mapped[Optional[str]] = mapped_column(Text)
 
@@ -98,7 +98,7 @@ class ManualMapping(Base):
     platform_id: Mapped[str] = mapped_column(Text, nullable=False)
     platform_slug: Mapped[Optional[str]] = mapped_column(Text)
     override_existing: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     def __repr__(self) -> str:
         return f"ManualMapping(id={self.id!r}, platform={self.platform!r}, title={self.title!r})"
@@ -114,7 +114,7 @@ class UnlinkedEntry(Base):
     title: Mapped[str] = mapped_column(Text, nullable=False)
     platform_id: Mapped[str] = mapped_column(Text, nullable=False)
     platform_slug: Mapped[Optional[str]] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     def __repr__(self) -> str:
         return f"UnlinkedEntry(id={self.id!r}, platform={self.platform!r}, title={self.title!r})"
@@ -132,7 +132,7 @@ class ChangeLog(Base):
     change_type: Mapped[str] = mapped_column(Text, nullable=False)
     processed: Mapped[bool] = mapped_column(Boolean, default=False)
     processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     def __repr__(self) -> str:
         return f"ChangeLog(id={self.id!r}, anime_id={self.anime_id!r}, change_type={self.change_type!r})"
@@ -151,7 +151,7 @@ class SyncStatus(Base):
     records_inserted: Mapped[Optional[int]] = mapped_column(Integer)
     records_updated: Mapped[Optional[int]] = mapped_column(Integer)
     records_deleted: Mapped[Optional[int]] = mapped_column(Integer)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     def __repr__(self) -> str:
         return f"SyncStatus(id={self.id!r}, sync_type={self.sync_type!r}, records_processed={self.records_processed!r})"
@@ -163,7 +163,7 @@ class SchemaVersion(Base):
     __tablename__ = "schema_version"
 
     version: Mapped[int] = mapped_column(Integer, primary_key=True)
-    applied_at: Mapped[datetime] = mapped_column(DateTime, default=func.now())
+    applied_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     def __repr__(self) -> str:
         return (
