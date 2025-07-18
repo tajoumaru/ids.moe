@@ -174,7 +174,7 @@ class IncrementalKVIngest:
         deletes = [c for c in changes if c.change_type == "delete"]
 
         batch_data: Dict[str, Union[str, None]] = {}
-        
+
         # Much larger batch sizes for KV operations
         batch_size = 10000 if self.is_upstash else 5000
 
@@ -184,12 +184,14 @@ class IncrementalKVIngest:
 
         # Process inserts/updates in bulk
         if insert_updates:
-            anime_data_bulk = self._get_anime_data_bulk(db_ops, [c.anime_id for c in insert_updates])
-            
+            anime_data_bulk = self._get_anime_data_bulk(
+                db_ops, [c.anime_id for c in insert_updates]
+            )
+
             for change in insert_updates:
                 anime_id = change.anime_id
                 anime_data = anime_data_bulk.get(anime_id)
-                
+
                 if anime_data:
                     # Generate platform keys
                     platform_keys = self._generate_platform_keys(anime_data, anime_id)
@@ -220,8 +222,8 @@ class IncrementalKVIngest:
         batch_items = list(batch_data.items())
         for i in range(0, total_keys, batch_size):
             batch_count += 1
-            batch_slice = dict(batch_items[i:i + batch_size])
-            
+            batch_slice = dict(batch_items[i : i + batch_size])
+
             pprint.print(
                 Platform.SYSTEM,
                 Status.INFO,
@@ -236,22 +238,26 @@ class IncrementalKVIngest:
             f"Processed {len(changes)} changes to KV store ({processed_count} operations)",
         )
 
-    def _get_anime_data_bulk(self, db_ops, anime_ids: List[int]) -> Dict[int, AnimeRecord]:
+    def _get_anime_data_bulk(
+        self, db_ops, anime_ids: List[int]
+    ) -> Dict[int, AnimeRecord]:
         """Get anime data from database by IDs in bulk - much faster than individual queries"""
         result_dict = {}
-        
+
         if not anime_ids:
             return result_dict
-            
+
         try:
             with db_ops.Session() as session:
                 from sqlalchemy import select
                 from generator.models import Anime
 
                 # Single query to get all anime records
-                results = session.execute(
-                    select(Anime).where(Anime.id.in_(anime_ids))
-                ).scalars().all()
+                results = (
+                    session.execute(select(Anime).where(Anime.id.in_(anime_ids)))
+                    .scalars()
+                    .all()
+                )
 
                 for result in results:
                     # Convert ORM object to AnimeRecord
@@ -284,14 +290,14 @@ class IncrementalKVIngest:
                         data_hash=result.data_hash,
                     )
                     result_dict[result.id] = anime_record
-                    
+
                 pprint.print(
                     Platform.SYSTEM,
                     Status.INFO,
                     f"Bulk fetched {len(result_dict)} anime records",
                 )
                 return result_dict
-                
+
         except Exception as e:
             pprint.print(
                 Platform.SYSTEM,
