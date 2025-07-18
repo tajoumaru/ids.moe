@@ -21,6 +21,9 @@ class SQLAlchemySchema:
 
     def _create_engine(self) -> Engine:
         """Create SQLAlchemy engine with libsql dialect."""
+        # Import TURSO_AUTH_TOKEN for remote connections
+        from generator.const import TURSO_AUTH_TOKEN
+
         # Check if the db_path is already a processed connection string
         if self.db_path.startswith("sqlite+libsql://"):
             # Already processed, use as-is
@@ -51,12 +54,24 @@ class SQLAlchemySchema:
                 # Local SQLite database
                 connection_string = f"sqlite+libsql:///{self.db_path}"
 
+        # Prepare connect_args for remote connections
+        connect_args = {}
+        if TURSO_AUTH_TOKEN and (
+            ".turso.io" in self.db_path
+            or ".aws" in self.db_path
+            or self.db_path.startswith("libsql://")
+            or self.db_path.startswith("ws://")
+            or self.db_path.startswith("wss://")
+        ):
+            connect_args["auth_token"] = TURSO_AUTH_TOKEN
+
         return create_engine(
             connection_string,
             echo=False,  # Set to True for SQL debugging
             pool_pre_ping=True,
             pool_recycle=3600,  # Recycle connections every hour
             future=True,
+            connect_args=connect_args,
         )
 
     def init_database(self) -> Engine:

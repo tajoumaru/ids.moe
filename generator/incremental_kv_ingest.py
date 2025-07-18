@@ -174,7 +174,11 @@ class IncrementalKVIngest:
             1000 if self.is_upstash else 100
         )  # Upstash can handle larger batches
 
-        for change in changes:
+        processed_count = 0
+        batch_count = 0
+        total_batches = (len(changes) + batch_size - 1) // batch_size
+
+        for i, change in enumerate(changes):
             anime_id = change.anime_id
             change_type = change.change_type
 
@@ -196,13 +200,27 @@ class IncrementalKVIngest:
                     # Add the complete data
                     batch_data[str(anime_id)] = json.dumps(asdict(anime_data))
 
+            processed_count += 1
+
             # Execute batch when it gets large enough
             if len(batch_data) >= batch_size:
+                batch_count += 1
+                pprint.print(
+                    Platform.SYSTEM,
+                    Status.INFO,
+                    f"Processing KV batch {batch_count}/{total_batches} ({processed_count}/{len(changes)} changes)",
+                )
                 self._execute_batch(batch_data)
                 batch_data = {}
 
         # Execute remaining batch
         if batch_data:
+            batch_count += 1
+            pprint.print(
+                Platform.SYSTEM,
+                Status.INFO,
+                f"Processing final KV batch {batch_count}/{total_batches} ({processed_count}/{len(changes)} changes)",
+            )
             self._execute_batch(batch_data)
 
         pprint.print(

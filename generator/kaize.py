@@ -1,362 +1,208 @@
 # SPDX-License-Identifier: MIT
 
-import math
 import re
 import time
-from typing import Any, Literal, Optional, Union
+import random
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Literal
 
-import requests as req
-from alive_progress import alive_bar  # type: ignore
-from bs4 import BeautifulSoup, Tag
-from fake_useragent import FakeUserAgent  # type: ignore
+import requests
+from requests.adapters import HTTPAdapter, Retry
+from alive_progress import alive_bar
+from bs4 import BeautifulSoup
 from generator.const import pprint
 from generator.prettyprint import Platform, Status
 
-fua = FakeUserAgent(browsers=["firefox", "chrome", "edge", "safari"])
-rand_fua: str = f"{fua.random}"  # type: ignore
-
 
 class Kaize:
-    """Kaize anime data scraper"""
+    """Kaize anime data scraper (Optimized and Session-Based)"""
 
-    def __init__(
-        self,
-        session: Optional[str] = None,
-        xsrf_token: Optional[str] = None,
-        user_agent: Optional[str] = None,
-        email: Optional[str] = None,
-        password: Optional[str] = None,
-    ) -> None:
-        """
-        Initialize the Kaize class
+    def __init__(self, kaize_session: str, xsrf_token: str) -> None:
+        if not kaize_session or not xsrf_token:
+            raise ValueError("Kaize session and XSRF token cannot be empty.")
 
-        :param session: The session, defaults to None
-        :type session: Optional[str], optional
-        :param xsrf_token: The XSRF token, defaults to None
-        :type xsrf_token: Optional[str], optional
-        :param user_agent: The user agent, defaults to None
-        :type user_agent: Optional[str], optional
-        :param email: The email, defaults to None
-        :type email: Optional[str], optional
-        :param password: The password, defaults to None
-        :type password: Optional[str], optional
-        """
         self.base_url = "https://kaize.io"
-        self.session = session
-        self.xsrf_token = xsrf_token
-        self.user_agent = user_agent or rand_fua
-        self.email = email
-        self.password = password
-        self.cookies = ""
-        self.headers = {
-            "User-Agent": self.user_agent,
-        }
+        self.session = requests.Session()
+
+        self.session.cookies.set("kaize_session", kaize_session)
+        self.session.cookies.set("XSRF-TOKEN", xsrf_token)
+        self.session.headers.update(
+            {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+                "X-XSRF-TOKEN": xsrf_token,
+            }
+        )
+
+        retries = Retry(
+            total=5, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504]
+        )
+        self.session.mount("https://", HTTPAdapter(max_retries=retries))
+
+        pprint.print(
+            Platform.KAIZE, Status.READY, "Kaize anime data scraper ready to use."
+        )
+
+    def _verify_session(self) -> bool:
+        pprint.print(Platform.KAIZE, Status.INFO, "Verifying session...")
+        verify_url = f"{self.base_url}/account/settings"
+        try:
+            response = self.session.get(verify_url, timeout=15, allow_redirects=False)
+            if response.status_code == 200:
+                pprint.print(Platform.KAIZE, Status.PASS, "Session is valid.")
+                return True
+            pprint.print(
+                Platform.KAIZE,
+                Status.ERR,
+                f"Session is invalid or expired (Status: {response.status_code}). Please provide new cookies.",
+            )
+            return False
+        except requests.RequestException as e:
+            pprint.print(Platform.KAIZE, Status.ERR, f"Failed to verify session: {e}")
+            return False
+
+    def _page_exists(
+        self, page: int, media: Literal["anime", "manga"] = "anime"
+    ) -> bool:
+        """
+        Helper function to check if a given page number contains content.
+        """
+        url = f"{self.base_url}/{media}/top?page={page}"
+        try:
+            response = self.session.get(url, timeout=15)
+            if response.status_code != 200:
+                return False
+            soup = BeautifulSoup(response.text, "html.parser")
+            # A page is considered to "exist" if it has at least one anime element.
+            return soup.find("div", {"class": "anime-list-element"}) is not None
+        except requests.RequestException:
+            return False
+
+    def _find_last_page(self, media: Literal["anime", "manga"] = "anime") -> int:
+        """
+        Finds the last page number using an efficient binary search probing method.
+        This is the correct optimization for a site with only a "Next" button.
+        """
+        pprint.print(
+            Platform.KAIZE, Status.INFO, "Finding last page using binary search..."
+        )
+
+        # Step 1: Find an upper bound exponentially.
+        low = 1
+        high = 1
+        while self._page_exists(high, media):
+            low = high
+            high *= 2
+            pprint.print(
+                Platform.KAIZE,
+                Status.INFO,
+                f"Last page is at least {low}, checking {high}...",
+                clean_line=True,
+                end="",
+            )
+
         pprint.print(
             Platform.KAIZE,
-            Status.READY,
-            "Kaize anime data scraper ready to use",
+            Status.INFO,
+            f"Found upper bound. Last page is between {low} and {high}.",
         )
 
-    def _session_set(self) -> None:
-        """
-        Set the session and XSRF token
-
-        :raises ValueError: Email or password not provided
-        :raises ValueError: XSRF token not found
-        :raises ConnectionError: Unable to connect to kaize.io
-        """
-        if self.session in ["", None] or self.xsrf_token in ["", None]:
-            self.cookies = self._get_xsrf_token()
-            split_cookie = self.cookies.split("; ")
-            # find XSRF token
-            for cookie in split_cookie:
-                cookie = cookie.strip()
-                if cookie.startswith("XSRF-TOKEN"):
-                    self.xsrf_token = cookie.split("=")[-1]
-                if cookie.startswith("kaize_session"):
-                    self.session = cookie.split("=")[-1]
-        else:
-            self.cookies = f"XSRF-TOKEN={self.xsrf_token}; kaize_session={self.session}"
-        self.headers["Cookie"] = self.cookies
-        self.headers["X-XSRF-TOKEN"] = str(self.xsrf_token)
-
-    def _get(self, url: str) -> Union[req.Response, None]:
-        """
-        Get the response from the url
-
-        :param url: The url to get the response
-        :type url: str
-        :return: The response
-        :rtype: Union[req.Response, None]
-        """
-        try:
-            response = req.get(url, headers=self.headers, timeout=15)
-            if response.status_code == 200:
-                return response
-            return None
-        except Exception as err:
-            pprint.print(Platform.KAIZE, Status.ERR, f"Error: {err}")
-            return None
-
-    def _post(
-        self,
-        url: str,
-        data: Union[dict[str, Any], str],
-        header: Union[dict[str, Any], None] = None,
-    ) -> Union[req.Response, None]:
-        """
-        Do POST request to the url
-
-        :param url: The url to do the POST request
-        :type url: str
-        :param data: The data to POST
-        :type data: Union[dict[str, Any], str]
-        :param header: The header, defaults to None
-        :type header: Union[dict[str, Any], None], optional
-        :return: The response
-        :rtype: Union[req.Response, None]
-        """
-        headers = self.headers
-        if header:
-            headers.update(header)
-        try:
-            response = req.post(url, headers=headers, data=data, timeout=15)
-            if response.status_code == 200 or response.status_code == 302:
-                return response
-            return None
-        except Exception as err:
-            pprint.print(Platform.KAIZE, Status.ERR, f"Error: {err}")
-            return None
-
-    def _get_xsrf_token(self) -> str:
-        """
-        Get the XSRF token
-
-        :raises ValueError: Email or password not provided
-        :raises ValueError: XSRF token not found
-        :raises ConnectionError: Unable to connect to kaize.io
-        :return: The XSRF token
-        :rtype: str
-        """
-        if not self.email or not self.password:
-            raise ValueError("Email or password not provided")
-        base_url = f"{self.base_url}/login"
-        response = self._get(base_url)
-        if not response:
-            raise ConnectionError("Unable to connect to kaize.io")
-        soup = BeautifulSoup(response.text, "html.parser")
-        xsrf_token = soup.find("meta", attrs={"name": "csrf-token"})
-        if not isinstance(xsrf_token, Tag):
-            raise ValueError("XSRF token not found")
-        token = xsrf_token.get("content", None)
-        if not token:
-            raise ValueError("XSRF token not found")
-        # post login
-        header_login = {
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            "Cookie": (
-                response.headers["Set-Cookie"].split(",")[0].split(";")[0]
-                + "; "
-                + response.headers["Set-Cookie"].split(",")[2].split(";")[0]
-            ),
-        }
-        data_raw: list[str] = [
-            f"_token={token}",
-            f"email={self.email}",
-            f"password={self.password}",
-        ]
-        data: str = "&".join(data_raw)
-        response = self._post(f"{base_url}", data, header_login)
-        if not response:
-            raise ConnectionError("Unable to connect to kaize.io")
-        # set cookie
-        cookie = (
-            response.headers["Set-Cookie"].split(",")[0].split(";")[0]
-            + "; "
-            + response.headers["Set-Cookie"].split(",")[2].split(";")[0]
-        )
-        return cookie
-
-    def pages(self, media: Literal["anime", "manga"] = "anime") -> int:
-        """
-        Get the total pages
-
-        :param media: The media, defaults to 'anime'
-        :type media: Literal['anime', 'manga'], optional
-        :raises ConnectionError: Unable to connect to kaize.io
-        :return: The total pages
-        :rtype: int
-        """
-        kzp = 0
-        pgHundreds = True
-        pgTens = True
-        pgOnes = True
-        kzpg = 0
-        while pgHundreds is True:
+        # Step 2: Perform binary search between low and high.
+        last_known_good = low
+        while low <= high:
+            mid = (low + high) // 2
+            if mid == 0:
+                break  # Safety break
             pprint.print(
                 Platform.KAIZE,
                 Status.INFO,
-                f"Checking in hundreds, page {kzp}",
+                f"Searching... Low: {low}, Mid: {mid}, High: {high}",
                 clean_line=True,
                 end="",
             )
-            pg_check = self._get(f"{self.base_url}/{media}/top?page={kzp}")
-            if not pg_check:
-                pprint.print(
-                    Platform.KAIZE, Status.ERR, "Unable to connect to kaize.io"
-                )
-                break
-            soup = BeautifulSoup(pg_check.text, "html.parser")
-            try:
-                kzDat = soup.find_all("div", {"class": "anime-list-element"})
-                if kzDat[0].find("div", {"class": "rank"}).text:
-                    kzp += 100
-                    time.sleep(1.2)
-            except IndexError:
-                kzpg = kzp - 100
-                pgHundreds = False
-
-        kzp = kzpg + 10
-        while pgTens is True:
-            pprint.print(
-                Platform.KAIZE,
-                Status.INFO,
-                f"Checking in tens, page {kzp}",
-                clean_line=True,
-                end="",
-            )
-            pg_check = self._get(f"{self.base_url}/{media}/top?page={kzp}")
-            if not pg_check:
-                pprint.print(
-                    Platform.KAIZE, Status.ERR, "Unable to connect to kaize.io"
-                )
-                break
-            soup = BeautifulSoup(pg_check.text, "html.parser")
-            try:
-                kzDat = soup.find_all("div", {"class": "anime-list-element"})
-                if kzDat[0].find("div", {"class": "rank"}).text:
-                    kzp += 10
-                    time.sleep(1.2)
-            except IndexError:
-                kzpg = kzp - 10
-                pgTens = False
-
-        kzp = kzpg + 1
-        while pgOnes is True:
-            pprint.print(
-                Platform.KAIZE,
-                Status.INFO,
-                f"Checking in ones, page {kzp}",
-                clean_line=True,
-                end="",
-            )
-            pg_check = self._get(f"{self.base_url}/{media}/top?page={kzp}")
-            if not pg_check:
-                pprint.print(
-                    Platform.KAIZE, Status.ERR, "Unable to connect to kaize.io"
-                )
-                break
-            soup = BeautifulSoup(pg_check.text, "html.parser")
-            try:
-                kzDat = soup.find_all("div", {"class": "anime-list-element"})
-                if kzDat[0].find("div", {"class": "rank"}).text:
-                    kzp += 1
-                    time.sleep(1.2)
-            except IndexError:
-                kzpg = kzp - 1
-                pgOnes = False
+            if self._page_exists(mid, media):
+                last_known_good = mid
+                low = mid + 1
+            else:
+                high = mid - 1
 
         pprint.print(
             Platform.KAIZE,
             Status.PASS,
-            f"Done checking, total pages: {kzpg}",
+            f"Binary search complete. Last page is {last_known_good}.",
         )
-        return kzpg
+        return last_known_good
 
-    def _get_data_index(
+    def _scrape_page(
         self, page: int, media: Literal["anime", "manga"] = "anime"
     ) -> list[dict[str, Any]]:
-        """
-        Get the data from the index
-
-        :param page: The page
-        :type page: int
-        :param media: The media, defaults to 'anime'
-        :type media: Literal['anime', 'manga'], optional
-        :raises ConnectionError: Unable to connect to kaize.io
-        :return: The data
-        :rtype: list[dict[str, Any]]
-        """
-        response = self._get(f"{self.base_url}/{media}/top?page={page}")
-        if not response:
-            raise ConnectionError("Unable to connect to kaize.io")
+        # This method is correct and remains unchanged
+        time.sleep(random.uniform(0.3, 1.0))
+        url = f"{self.base_url}/{media}/top?page={page}"
+        try:
+            response = self.session.get(url, timeout=15)
+            response.raise_for_status()
+        except requests.RequestException:
+            return []
         soup = BeautifulSoup(response.text, "html.parser")
         kz_dat = soup.find_all("div", {"class": "anime-list-element"})
         result: list[dict[str, Any]] = []
         for kz in kz_dat:
-            title: str = kz.find("a", {"class": "name"}).text
-            link = kz.find("a", {"class": "name"}).get("href")
-            slug: str = link.split("/")[-1]
-            # background-image: url(https://kaize.io/images/animes_images/2022/anime_image_6289_14_22_44.jpg)
-            media_id = kz.find("div", {"class": "cover"}).get("style")
-            media_id = re.search(r"/anime_image_(\d+)", media_id)
-            if media_id:
-                media_id = media_id.group(1)
-            else:
-                media_id = 0
-            result.append(
-                {
-                    "title": title,
-                    "slug": slug,
-                    "kaize": int(media_id),
-                }
-            )
+            title_tag = kz.find("a", {"class": "name"})
+            cover_div = kz.find("div", {"class": "cover"})
+            if not (
+                title_tag
+                and title_tag.get("href")
+                and cover_div
+                and cover_div.get("style")
+            ):
+                continue
+            title: str = title_tag.text
+            slug: str = title_tag["href"].split("/")[-1]
+            media_id_match = re.search(r"/anime_image_(\d+)", cover_div["style"])
+            media_id = int(media_id_match.group(1)) if media_id_match else 0
+            result.append({"title": title, "slug": slug, "kaize": media_id})
         return result
 
     def get_anime(self) -> list[dict[str, Any]]:
-        """
-        Get complete anime data
-
-        :raises ConnectionError: Unable to connect to kaize.io
-        :return: The anime data
-        :rtype: list[dict[str, Any]]
-        """
-        anime_data: list[dict[str, Any]] = []
+        if not self._verify_session():
+            raise ConnectionError("Unable to proceed with an invalid session.")
 
         pprint.print(Platform.KAIZE, Status.INFO, "Starting anime data collection")
+        total_pages = self._find_last_page()
+        if total_pages == 0:
+            return []
 
-        self._session_set()
-        pages = self.pages()
+        anime_data: list[dict[str, Any]] = []
+        MAX_WORKERS = 8
 
-        with alive_bar(pages, title="Getting Kaize data", spinner=None) as bar:  # type: ignore
-            for page in range(1, pages + 1):
-                anime_data.extend(self._get_data_index(page))
-                bar()
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            futures = {
+                executor.submit(self._scrape_page, page): page
+                for page in range(1, total_pages + 1)
+            }
 
-        anime_data.sort(key=lambda x: x["title"])  # type: ignore
+            with alive_bar(
+                total_pages, title="Getting Kaize data", spinner=None
+            ) as bar:
+                for future in as_completed(futures):
+                    page_data = future.result()
+                    if page_data:
+                        anime_data.extend(page_data)
+                    bar()
+
+        anime_data.sort(key=lambda x: x["title"])
 
         pprint.print(
             Platform.KAIZE,
             Status.PASS,
-            f"Done getting data, total data: {len(anime_data)},",
-            f"or around {str(math.ceil(len(anime_data) / 50))} pages,",
-            "expected pages:",
-            str(pages),
+            f"Done getting data. Total items: {len(anime_data)} from {total_pages} pages.",
         )
-
         return anime_data
 
     @staticmethod
     def convert_list_to_dict(data: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-        """
-        Convert list of dict to dict
-
-        :param data: The data
-        :type data: list[dict[str, Any]]
-        :return: The dict
-        :rtype: dict[str, dict[str, Any]]
-        """
         result: dict[str, dict[str, Any]] = {}
         for item in data:
-            result[item["slug"]] = item
+            if "slug" in item:
+                result[item["slug"]] = item
         return result

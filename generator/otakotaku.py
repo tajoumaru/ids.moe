@@ -1,186 +1,206 @@
 # SPDX-License-Identifier: MIT
 
-from typing import Any, Union
+import random
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Optional, Union
 
-import requests as req
-from alive_progress import alive_bar  # type: ignore
+import requests
+from requests.adapters import HTTPAdapter, Retry
+from alive_progress import alive_bar
 from bs4 import BeautifulSoup, Tag
-from fake_useragent import FakeUserAgent  # type: ignore
 from generator.const import pprint
 from generator.prettyprint import Platform, Status
 
-fua = FakeUserAgent(browsers=["chrome"])
-rand_fua: str = f"{fua.random}"  # type: ignore
-
 
 class OtakOtaku:
-    """OtakOtaku anime data scraper"""
+    """OtakOtaku anime data scraper (Optimized and Safer)"""
 
     def __init__(self) -> None:
-        """Initiate the class"""
-        self.headers = {
-            "authority": "otakotaku.com",
-            "accept": "*/*",
-            "accept-language": "en-US,en;q=0.9",
-            "cookie": "lang=id",
-            "dnt": "1",
-            "referer": "https://otakotaku.com/anime/view/1/yahari-ore-no-seishun-love-comedy-wa-machigatteiru",
-            "sec-ch-ua": '"Chromium";v="116", " Not)A;Brand";v="24", "Microsoft Edge";v="116"',
-            "sec-ch-ua-mobile": "?0",
-            "sec-ch-ua-platform": '"Windows"',
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "same-origin",
-            "sec-gpc": "1",
-            "user-agent": rand_fua,
-            "x-requested-with": "XMLHttpRequest",
-            "Content-Encoding": "gzip",
-        }
+        """Initiate the class with a persistent and resilient session."""
+        self.session = requests.Session()
+
+        # Strategy: Implement automatic retries with exponential backoff.
+        # This tells requests to retry on common server errors (5xx) or rate-limit codes (429).
+        # It will wait {backoff factor} * (2 ** ({number of retries} - 1)) seconds.
+        # e.g., for backoff_factor=0.5: 0.5s, 1s, 2s, 4s, 8s
+        retries = Retry(
+            total=5,
+            backoff_factor=0.5,
+            status_forcelist=[429, 500, 502, 503, 504],
+        )
+        self.session.mount("https://", HTTPAdapter(max_retries=retries))
+
+        # Strategy: Simplify headers and use a standard User-Agent.
+        self.session.headers.update(
+            {
+                "Referer": "https://otakotaku.com/",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+                "Accept-Encoding": "gzip, deflate",
+            }
+        )
+
         pprint.print(
             Platform.OTAKOTAKU,
             Status.READY,
             "OtakOtaku anime data scraper ready to use",
         )
 
-    def _get(self, url: str) -> Union[req.Response, None]:
+    def _get(self, url: str) -> Optional[requests.Response]:
         """
-        Get the response from the url
+        Get the response from the url using the resilient session.
+        Retries are handled automatically by the session.
 
         :param url: The url to get the response
-        :type url: str
-        :return: The response from the url
-        :rtype: Union[req.Response, None]
+        :return: The response from the url or None on final error
         """
-        response = req.get(url, headers=self.headers, timeout=15)
         try:
+            response = self.session.get(url, timeout=15)
             response.raise_for_status()
             return response
-        except Exception as err:
-            pprint.print(Platform.OTAKOTAKU, Status.ERR, f"Error: {err}")
+        except requests.RequestException as err:
+            pprint.print(
+                Platform.OTAKOTAKU,
+                Status.ERR,
+                f"Request failed for {url} after retries: {err}",
+            )
             return None
 
     def get_latest_anime(self) -> int:
         """
-        Get latest anime from the website
-
-        :return: The latest anime id
-        :rtype: int
+        Get latest anime from the website.
         """
         url = "https://otakotaku.com/anime/feed"
         response = self._get(url)
         if not response:
-            raise ConnectionError("Failed to connect to otakotaku.com")
+            raise ConnectionError(
+                "Failed to connect to otakotaku.com to get latest ID."
+            )
+
         soup = BeautifulSoup(response.text, "html.parser")
-        link = soup.find("div", class_="anime-img")
-        if not isinstance(link, Tag):
-            pprint.print(Platform.OTAKOTAKU, Status.ERR, "Failed to get latest anime")
+        link_tag = soup.select_one("div.anime-img > a")  # Robust CSS selector
+
+        if not isinstance(link_tag, Tag) or not link_tag.get("href"):
+            pprint.print(
+                Platform.OTAKOTAKU, Status.ERR, "Failed to parse latest anime ID."
+            )
             return 0
-        link = link.find("a")
-        if not isinstance(link, Tag):
-            pprint.print(Platform.OTAKOTAKU, Status.ERR, "Failed to get latest anime")
-            return 0
-        href = link.get("href")
-        if not href:
-            pprint.print(Platform.OTAKOTAKU, Status.ERR, "Failed to get latest anime")
-            return 0
+
+        href = link_tag["href"]
         if isinstance(href, list):
             href = href[0]
-        anime_id = href.rstrip("/").split("/")[-2]
+
+        anime_id_str = href.rstrip("/").split("/")[-2]
+        if not anime_id_str.isdigit():
+            pprint.print(
+                Platform.OTAKOTAKU,
+                Status.ERR,
+                f"Could not extract a valid anime ID from href: {href}",
+            )
+            return 0
+
+        anime_id = int(anime_id_str)
         pprint.print(Platform.OTAKOTAKU, Status.PASS, f"Latest anime id: {anime_id}")
-        return int(anime_id)
+        return anime_id
 
-    def _get_data(self, anime_id: int) -> Union[dict[str, Any], None]:
+    def _get_data(self, anime_id: int) -> Optional[dict[str, Any]]:
         """
-        Get anime data
+        Get anime data for a single ID with a polite delay.
+        This function is the target for our concurrent calls.
+        """
+        # Strategy: Add a small, random delay to each worker task to appear more "human".
+        time.sleep(random.uniform(0.1, 0.4))
 
-        :param anime_id: The anime id
-        :type anime_id: int
-        :return: The anime data
-        :rtype: Union[dict[str, Any], None]
-        """
-        response = self._get(
-            f"https://otakotaku.com/api/anime/view/{anime_id}/yahari-ore-no-seishun-love-comedy-wa-machigatteiru"
-        )
+        # The trailing part of the URL is ignored by the API, so we can simplify it.
+        url = f"https://otakotaku.com/api/anime/view/{anime_id}"
+        response = self._get(url)
         if not response:
-            raise ConnectionError("Failed to connect to otakotaku.com")
-        json_: dict[str, Any] = response.json()
-        if not json_:
             return None
+
+        try:
+            json_ = response.json()
+        except requests.JSONDecodeError:
+            # This is expected for non-existent IDs which return HTML error pages.
+            return None
+
+        if not json_ or "data" not in json_ or not json_["data"]:
+            # This is a common case for IDs that don't exist. We can ignore it.
+            return None
+
         data: dict[str, Any] = json_["data"]
-        mal: Union[str, int, None] = data.get("`mal_id_anime", None)
-        if mal:
-            mal = int(mal)
-        apla = data.get("ap_id_anime", None)
-        if apla:
-            apla = int(apla)
-        anidb = data.get("anidb_id_anime", None)
-        if anidb:
-            anidb = int(anidb)
-        ann = data.get("ann_id_anime", None)
-        if ann:
-            ann = int(ann)
-        title = data["judul_anime"]
-        title = title.replace("&quot;", '"')
+
+        def to_int(value: Any) -> Optional[int]:
+            return int(value) if value else None
+
+        title = data.get("judul_anime", "").replace('"""', '"')
+        if not title:
+            return None  # Skip entries without a title
+
         result: dict[str, Union[str, int, None]] = {
-            "otakotaku": int(data["id_anime"]),
+            "otakotaku": to_int(data.get("id_anime")),
             "title": title,
-            "myanimelist": mal,
-            "animeplanet": apla,
-            "anidb": anidb,
-            "animenewsnetwork": ann,
+            "myanimelist": to_int(data.get("mal_id_anime")),
+            "animeplanet": to_int(data.get("ap_id_anime")),
+            "anidb": to_int(data.get("anidb_id_anime")),
+            "animenewsnetwork": to_int(data.get("ann_id_anime")),
         }
         return result
 
     def get_anime(self) -> list[dict[str, Any]]:
         """
-        Get complete anime data
-
-        :return: The anime data
-        :rtype: list[dict[str, Any]]
+        Get complete anime data concurrently and safely.
         """
-        anime_list: list[dict[str, Any]] = []
-
-        pprint.print(Platform.OTAKOTAKU, Status.INFO, "Starting anime data collection")
+        pprint.print(
+            Platform.OTAKOTAKU,
+            Status.INFO,
+            "Starting safer concurrent anime data collection",
+        )
 
         latest_id = self.get_latest_anime()
         if not latest_id:
-            raise ConnectionError("Failed to connect to otakotaku.com")
+            raise ValueError("Could not determine the latest anime ID to scrape.")
 
-        # Get all anime data from 1 to latest_id
-        with alive_bar(latest_id, title="Getting OtakOtaku data", spinner=None) as bar:  # type: ignore
-            for anime_id in range(1, latest_id + 1):
-                data_index = self._get_data(anime_id)
-                if not data_index:
-                    pprint.print(
-                        Platform.OTAKOTAKU,
-                        Status.ERR,
-                        f"Failed to get data index for anime id: {anime_id},"
-                        " data may be empty or invalid",
-                    )
-                    bar()
-                    continue
-                anime_list.append(data_index)
-                bar()
+        anime_list: list[dict[str, Any]] = []
 
-        anime_list.sort(key=lambda x: x["title"])  # type: ignore
+        # Strategy: Use a conservative number of workers to avoid IP bans.
+        # Start here. You can try increasing to 20 or 25 if no errors occur.
+        MAX_WORKERS = 25
+
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            # Submit all jobs to the executor
+            futures = {
+                executor.submit(self._get_data, anime_id): anime_id
+                for anime_id in range(1, latest_id + 1)
+            }
+
+            # Use alive_bar to track progress as futures complete
+            with alive_bar(
+                latest_id, title="Getting OtakOtaku data", spinner=None
+            ) as bar:
+                for future in as_completed(futures):
+                    data_index = future.result()
+                    if data_index:
+                        anime_list.append(data_index)
+                    bar()  # Manually advance the progress bar for each completed task
+
+        # Sorting is done once at the end, which is efficient.
+        anime_list.sort(key=lambda x: x["title"])
 
         pprint.print(
-            Platform.OTAKOTAKU, Status.PASS, f"Total anime data: {len(anime_list)}"
+            Platform.OTAKOTAKU,
+            Status.PASS,
+            f"Total anime data collected: {len(anime_list)}",
         )
-
         return anime_list
 
     @staticmethod
     def convert_list_to_dict(data: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
         """
-        Convert list to dict
-
-        :param data: The list to convert
-        :type data: list[dict[str, Any]]
-        :return: The converted list
-        :rtype: dict[str, dict[str, Any]]
+        Convert list to dict.
         """
         result: dict[str, dict[str, Any]] = {}
         for item in data:
-            result[str(item["otakotaku"])] = item
+            # Add a check to ensure the key exists and is not None
+            if "otakotaku" in item and item["otakotaku"] is not None:
+                result[str(item["otakotaku"])] = item
         return result

@@ -8,6 +8,9 @@ on:
       - main
     paths:
       - "generator/*"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/*"
 concurrency:
   group: "generator"
   cancel-in-progress: true

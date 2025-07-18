@@ -485,7 +485,8 @@ class CacheDownloader:
         try:
             # Initialize and run scraper
             kaize = Kaize(
-                session=session, xsrf_token=xsrf_token, email=email, password=password
+                kaize_session=session,  # type: ignore
+                xsrf_token=xsrf_token,  # type: ignore
             )
 
             # Get data
