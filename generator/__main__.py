@@ -16,8 +16,7 @@ from generator.pipeline import SQLAlchemyPipeline
 from generator.const import (
     pprint,
     CACHE_DIR,
-    TURSO_DATABASE_URL,
-    TURSO_AUTH_TOKEN,
+    DATABASE_URL,
     GITHUB_TOKEN,
     KAIZE_SESSION,
     KAIZE_XSRF_TOKEN,
@@ -27,7 +26,6 @@ from generator.const import (
     REDIS_HOST,
     KV_REST_API_URL,
     KV_REST_API_TOKEN,
-    process_turso_url,
 )
 from generator.prettyprint import Platform, Status
 
@@ -80,12 +78,12 @@ def check_environment_variables():
             "  Set either REDIS_URL/REDIS_HOST or KV_REST_API_URL/KV_REST_API_TOKEN",
         )
 
-    # Check Turso/SQLite configuration
-    if TURSO_AUTH_TOKEN:
-        pprint.print(Platform.SYSTEM, Status.PASS, "Turso authentication token is set")
+    # Check PostgreSQL configuration
+    if DATABASE_URL:
+        pprint.print(Platform.SYSTEM, Status.PASS, "PostgreSQL DATABASE_URL is set")
     else:
         pprint.print(
-            Platform.SYSTEM, Status.INFO, "No Turso auth token (using local SQLite)"
+            Platform.SYSTEM, Status.FAIL, "PostgreSQL DATABASE_URL is required"
         )
 
     pprint.print(Platform.SYSTEM, Status.INFO, "")
@@ -485,8 +483,8 @@ def prune_cache(cache_dir: str):
         return False
 
 
-def prune_turso(db_path: str):
-    """Prune Turso/SQLite database."""
+def prune_database(db_path: str):
+    """Prune PostgreSQL database."""
     pprint.print(Platform.SYSTEM, Status.INFO, f"Pruning database: {db_path}")
 
     # Ask for confirmation
@@ -545,7 +543,7 @@ def prune_all(db_path: str, cache_dir: str):
 
     success = True
     success &= prune_cache(cache_dir)
-    success &= prune_turso(db_path)
+    success &= prune_database(db_path)
     success &= prune_redis()
 
     if success:
@@ -567,8 +565,7 @@ def main():
 
     # Full command (default)
     full_parser = subparsers.add_parser("full", help="Run complete pipeline (default)")
-    full_parser.add_argument("--turso-url", help="Turso database URL")
-    full_parser.add_argument("--turso-token", help="Turso authentication token")
+    full_parser.add_argument("--database-url", help="PostgreSQL database URL")
     full_parser.add_argument("--cache-dir", help="Cache directory path")
     full_parser.add_argument("--redis-url", help="Redis connection URL")
     full_parser.add_argument("--redis-host", help="Redis host")
@@ -585,8 +582,7 @@ def main():
 
     # Download command
     download_parser = subparsers.add_parser("download", help="Run download phase only")
-    download_parser.add_argument("--turso-url", help="Turso database URL")
-    download_parser.add_argument("--turso-token", help="Turso authentication token")
+    download_parser.add_argument("--database-url", help="PostgreSQL database URL")
     download_parser.add_argument("--cache-dir", help="Cache directory path")
     download_parser.add_argument(
         "--ignore-cache",
@@ -599,8 +595,7 @@ def main():
 
     # Process command
     process_parser = subparsers.add_parser("process", help="Run processing phase only")
-    process_parser.add_argument("--turso-url", help="Turso database URL")
-    process_parser.add_argument("--turso-token", help="Turso authentication token")
+    process_parser.add_argument("--database-url", help="PostgreSQL database URL")
     process_parser.add_argument("--cache-dir", help="Cache directory path")
     process_parser.add_argument(
         "--no-env-check", action="store_true", help="Skip environment variable checks"
@@ -608,8 +603,7 @@ def main():
 
     # Ingest command
     ingest_parser = subparsers.add_parser("ingest", help="Run KV ingestion phase only")
-    ingest_parser.add_argument("--turso-url", help="Turso database URL")
-    ingest_parser.add_argument("--turso-token", help="Turso authentication token")
+    ingest_parser.add_argument("--database-url", help="PostgreSQL database URL")
     ingest_parser.add_argument("--redis-url", help="Redis connection URL")
     ingest_parser.add_argument("--redis-host", help="Redis host")
     ingest_parser.add_argument("--redis-port", type=int, help="Redis port")
@@ -628,8 +622,7 @@ def main():
 
     # Status command
     status_parser = subparsers.add_parser("status", help="Check pipeline status")
-    status_parser.add_argument("--turso-url", help="Turso database URL")
-    status_parser.add_argument("--turso-token", help="Turso authentication token")
+    status_parser.add_argument("--database-url", help="PostgreSQL database URL")
     status_parser.add_argument(
         "--no-env-check", action="store_true", help="Skip environment variable checks"
     )
@@ -645,15 +638,13 @@ def main():
     )
     cache_prune_parser.add_argument("--cache-dir", help="Cache directory path")
 
-    turso_prune_parser = prune_subparsers.add_parser("turso", help="Prune database")
-    turso_prune_parser.add_argument("--turso-url", help="Turso database URL")
-    turso_prune_parser.add_argument("--turso-token", help="Turso authentication token")
+    db_prune_parser = prune_subparsers.add_parser("database", help="Prune database")
+    db_prune_parser.add_argument("--database-url", help="PostgreSQL database URL")
 
     prune_subparsers.add_parser("redis", help="Prune Redis/KV store")
 
     all_prune_parser = prune_subparsers.add_parser("all", help="Prune all data")
-    all_prune_parser.add_argument("--turso-url", help="Turso database URL")
-    all_prune_parser.add_argument("--turso-token", help="Turso authentication token")
+    all_prune_parser.add_argument("--database-url", help="PostgreSQL database URL")
     all_prune_parser.add_argument("--cache-dir", help="Cache directory path")
 
     # Parse arguments
@@ -665,18 +656,10 @@ def main():
 
     # Configure database path
     db_path = (
-        args.turso_url
-        if hasattr(args, "turso_url") and args.turso_url
-        else TURSO_DATABASE_URL
+        args.database_url
+        if hasattr(args, "database_url") and args.database_url
+        else DATABASE_URL
     )
-    auth_token = (
-        args.turso_token
-        if hasattr(args, "turso_token") and args.turso_token
-        else TURSO_AUTH_TOKEN
-    )
-
-    if hasattr(args, "turso_url") and args.turso_url:
-        db_path = process_turso_url(args.turso_url, auth_token)
 
     # Configure cache directory
     cache_dir = (
@@ -703,8 +686,8 @@ def main():
     elif args.command == "prune":
         if args.prune_target == "cache":
             success = prune_cache(cache_dir)
-        elif args.prune_target == "turso":
-            success = prune_turso(db_path)
+        elif args.prune_target == "database":
+            success = prune_database(db_path)
         elif args.prune_target == "redis":
             success = prune_redis()
         elif args.prune_target == "all":
@@ -713,7 +696,7 @@ def main():
             pprint.print(
                 Platform.SYSTEM,
                 Status.ERR,
-                "Please specify what to prune: cache, turso, redis, or all",
+                "Please specify what to prune: cache, database, redis, or all",
             )
             sys.exit(1)
 

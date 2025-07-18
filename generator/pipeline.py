@@ -16,7 +16,7 @@ from generator.cache_downloader import CacheDownloader
 from generator.data_extractor import DataExtractor
 from generator.incremental_kv_ingest import IncrementalKVIngest
 from generator.status_updater import StatusUpdater
-from generator.const import pprint, CACHE_DIR, TURSO_DATABASE_URL
+from generator.const import pprint, CACHE_DIR, DATABASE_URL
 from generator.prettyprint import Platform, Status
 
 
@@ -534,7 +534,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         db_path = sys.argv[1]
     else:
-        db_path = TURSO_DATABASE_URL
+        db_path = DATABASE_URL
 
     result = run_full_pipeline(db_path)
 

@@ -32,44 +32,25 @@ GITHUB_DISPATCH = os.getenv("GITHUB_EVENT_NAME") == "workflow_dispatch"
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 """GitHub API token for authenticated requests"""
 
-# Turso/SQLite database configuration
-TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL", "anime_data.db")
-"""Turso database URL (can be local file or remote URL)"""
-TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
-"""Turso authentication token (only for remote connections)"""
+# PostgreSQL database configuration
+DATABASE_URL = os.getenv("DATABASE_URL")
+"""PostgreSQL database URL for serverless PostgreSQL connection"""
 
 
-# Process Turso URL to ensure proper format
-def process_turso_url(url: str, auth_token: str | None = None) -> str:
-    """Process Turso URL to ensure proper format."""
-    # Remove protocol if present
-    if url.startswith("libsql://"):
-        url = url[9:]
-    elif url.startswith("sqlite://"):
-        url = url[9:]
-    elif url.startswith("sqlite+libsql://"):
-        url = url[16:]
+# Process PostgreSQL URL to ensure proper format
+def process_database_url(url: str | None = None) -> str:
+    """Process PostgreSQL URL to ensure proper format for asyncpg."""
+    if not url:
+        raise ValueError("DATABASE_URL environment variable is required")
 
-    # Check if it's a remote URL
-    is_remote = ".turso.io" in url or ".aws" in url or "://" in url
+    # Convert postgresql:// to postgresql+asyncpg:// for SQLAlchemy async
+    import re
 
-    # Build proper connection string
-    if is_remote:
-        connection_url = f"sqlite+libsql://{url}"
-        # Add secure parameter if auth token is provided
-        if auth_token and "?secure=true" not in connection_url:
-            connection_url += "?secure=true"
-    else:
-        # Local file
-        connection_url = f"sqlite+libsql:///{url}"
-
-    return connection_url
+    return re.sub(r"^postgresql:", "postgresql+asyncpg:", url)
 
 
 # Process the URL
-TURSO_DATABASE_URL = process_turso_url(
-    TURSO_DATABASE_URL or "anime_data.db", TURSO_AUTH_TOKEN
-)
+DATABASE_URL = process_database_url(DATABASE_URL)
 
 # Cache configuration
 CACHE_DIR = os.getenv("CACHE_DIR", "cache")

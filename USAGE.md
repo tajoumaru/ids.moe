@@ -2,7 +2,7 @@
 
 ## Overview
 
-The AnimeAPI pipeline is a comprehensive data processing system that downloads, processes, and syncs anime data from multiple sources to a SQLite database and Redis/KV store.
+The AnimeAPI pipeline is a comprehensive data processing system that downloads, processes, and syncs anime data from multiple sources to a PostgreSQL database and Redis/KV store.
 
 ## CLI Commands
 
@@ -22,7 +22,7 @@ Executes all three phases: download, process, and KV sync. This is the default c
 ```bash
 uv run generator full
 uv run generator  # Same as above (default)
-uv run generator full --turso-url your-db.turso.io --cache-dir /custom/cache
+uv run generator full --database-url postgresql://user:pass@host:5432/db --cache-dir /custom/cache
 ```
 
 #### `download` - Download Phase Only
@@ -39,7 +39,7 @@ Processes downloaded cache files and updates the database. Does not download or 
 
 ```bash
 uv run generator process
-uv run generator process --turso-url your-db.turso.io --cache-dir /custom/cache
+uv run generator process --database-url postgresql://user:pass@host:5432/db --cache-dir /custom/cache
 ```
 
 #### `ingest` - KV Ingestion Phase Only
@@ -56,7 +56,7 @@ Displays current database statistics and sync information.
 
 ```bash
 uv run generator status
-uv run generator status --turso-url your-db.turso.io
+uv run generator status --database-url postgresql://user:pass@host:5432/db
 ```
 
 #### `prune` - Data Cleanup Commands
@@ -64,7 +64,7 @@ Remove data with confirmation prompts.
 
 ```bash
 uv run generator prune cache     # Remove all cached files
-uv run generator prune turso     # Clear entire database
+uv run generator prune database  # Clear entire database
 uv run generator prune redis     # Clear Redis/KV store
 uv run generator prune all       # Remove all data (requires double confirmation)
 ```
@@ -74,8 +74,7 @@ uv run generator prune all       # Remove all data (requires double confirmation
 #### Database Configuration
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--turso-url` | Database URL (local file or Turso remote) | From `TURSO_DATABASE_URL` env var |
-| `--turso-token` | Turso authentication token | From `TURSO_AUTH_TOKEN` env var |
+| `--database-url` | PostgreSQL database URL | From `DATABASE_URL` env var |
 
 #### Cache Configuration
 | Option | Description | Default |
@@ -115,8 +114,7 @@ All configuration is primarily done through environment variables. Command-line 
 #### Database Configuration
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `TURSO_DATABASE_URL` | Database URL (local file or remote) | `anime_data.db` or `your-db.turso.io` |
-| `TURSO_AUTH_TOKEN` | Authentication token (for remote Turso only) | `your-auth-token` |
+| `DATABASE_URL` | PostgreSQL database URL | `postgresql://user:pass@localhost:5432/animeapi` |
 
 #### Cache Configuration
 | Variable | Description | Default |
@@ -175,16 +173,41 @@ Configure **either** regular Redis or Upstash Redis (not both):
 
 ### Database URL Format
 
-The `TURSO_DATABASE_URL` supports multiple formats:
+The `DATABASE_URL` must be a PostgreSQL connection string:
 
-- **Local SQLite**: `anime_data.db` or `./path/to/database.db`
-- **Remote Turso**: `your-db.turso.io` or `your-db.aws-eu-west-1.turso.io`
-- **With protocol**: `sqlite://anime_data.db` or `libsql://your-db.turso.io`
+**Format**: `postgresql://username:password@host:port/database`
 
-The system automatically:
-- Adds `sqlite+libsql://` protocol prefix
-- Adds `?secure=true` parameter for remote connections with auth tokens
-- Handles both local and remote databases seamlessly
+**Examples**:
+- **Local PostgreSQL**: `postgresql://user:pass@localhost:5432/animeapi`
+- **With SSL**: `postgresql://user:pass@host:5432/animeapi?sslmode=require`
+- **Serverless PostgreSQL**: `postgresql://user:pass@serverless-db.example.com:5432/animeapi?sslmode=require`
+
+### Recommended Serverless PostgreSQL Providers
+
+1. **Neon** (https://neon.tech)
+   ```
+   DATABASE_URL=postgresql://user:pass@ep-xxx-xxx.us-east-1.aws.neon.tech/animeapi?sslmode=require
+   ```
+
+2. **Supabase** (https://supabase.com)
+   ```
+   DATABASE_URL=postgresql://postgres:pass@db.xxx.supabase.co:5432/postgres?sslmode=require
+   ```
+
+3. **Vercel Postgres** (https://vercel.com/storage/postgres)
+   ```
+   DATABASE_URL=postgresql://user:pass@ep-xxx-xxx.us-east-1.postgres.vercel-storage.com/animeapi?sslmode=require
+   ```
+
+4. **Railway** (https://railway.app)
+   ```
+   DATABASE_URL=postgresql://postgres:pass@containers-us-west-xxx.railway.app:5432/railway
+   ```
+
+5. **AWS RDS Serverless** (https://aws.amazon.com/rds/serverless/)
+   ```
+   DATABASE_URL=postgresql://user:pass@cluster.cluster-xxx.us-east-1.rds.amazonaws.com:5432/animeapi
+   ```
 
 ## Example Workflows
 
@@ -192,7 +215,7 @@ The system automatically:
 
 ```bash
 # Set up environment variables
-export TURSO_DATABASE_URL="anime_data.db"
+export DATABASE_URL="postgresql://user:pass@localhost:5432/animeapi"
 export CACHE_DIR="cache"
 export GITHUB_TOKEN="ghp_your_token_here"
 export REDIS_URL="redis://localhost:6379"
@@ -201,12 +224,11 @@ export REDIS_URL="redis://localhost:6379"
 uv run generator full
 ```
 
-### Production with Turso Cloud
+### Production with Serverless PostgreSQL
 
 ```bash
-# Set Turso credentials
-export TURSO_DATABASE_URL="your-db.turso.io"
-export TURSO_AUTH_TOKEN="your-auth-token"
+# Set PostgreSQL and Redis credentials
+export DATABASE_URL="postgresql://user:pass@ep-xxx-xxx.us-east-1.aws.neon.tech/animeapi?sslmode=require"
 export KV_REST_API_URL="https://your-redis.upstash.io"
 export KV_REST_API_TOKEN="your-upstash-token"
 
@@ -262,8 +284,18 @@ uv run generator prune all
 ## Pipeline Phases
 
 1. **Download Phase**: Fetches data from GitHub and runs web scrapers
-2. **Processing Phase**: Extracts, matches, and merges anime data into database
+2. **Processing Phase**: Extracts, matches, and merges anime data into PostgreSQL database
 3. **KV Ingestion Phase**: Syncs processed data to Redis/KV store for API access
+
+## Performance Improvements
+
+The migration to PostgreSQL provides significant performance benefits:
+
+- **Faster Bulk Operations**: PostgreSQL handles large datasets much better than SQLite
+- **Async Operations**: All database operations are now asynchronous with connection pooling
+- **Larger Batch Sizes**: Increased from 999 (SQLite limit) to 1000+ records per batch
+- **Better Concurrency**: Connection pooling allows multiple operations simultaneously
+- **Serverless Ready**: Works with all major serverless PostgreSQL providers
 
 ## Output Information
 
@@ -280,14 +312,15 @@ The pipeline provides detailed progress information:
 
 ### Common Issues
 
+- **"PostgreSQL DATABASE_URL is required"**: Set the `DATABASE_URL` environment variable
 - **"Missing Redis credentials"**: Set either `REDIS_URL`/`REDIS_HOST` or `KV_REST_API_URL`/`KV_REST_API_TOKEN`
-- **"No such file or directory"**: Ensure `TURSO_DATABASE_URL` points to a valid path or Turso instance
-- **"Resource temporarily unavailable"**: System resource limit reached, try closing other applications
-- **"Too many SQL variables"**: Should be automatically handled with batching
+- **"Connection refused"**: Ensure PostgreSQL server is running and accessible
+- **"SSL required"**: Add `?sslmode=require` to your DATABASE_URL for serverless providers
 - **Rate limiting**: Set `GITHUB_TOKEN` to avoid GitHub API limits
 
 ### Performance Tips
 
+- Use a serverless PostgreSQL provider for best performance
 - Use `GITHUB_TOKEN` to avoid API rate limits
 - Use `--ignore-cache` sparingly to avoid unnecessary downloads
 - Use `--force-overwrite-all` only when KV store is corrupted
@@ -302,3 +335,12 @@ uv run generator full --no-env-check
 ```
 
 This is useful when testing with minimal configuration.
+
+## Migration from SQLite/Turso
+
+If you're migrating from the previous SQLite/Turso setup:
+
+1. **Update dependencies**: `pip install -e .` (asyncpg will be installed automatically)
+2. **Set DATABASE_URL**: Replace `TURSO_DATABASE_URL` with `DATABASE_URL`
+3. **Run migration**: The first run will automatically create PostgreSQL tables
+4. **Better performance**: Enjoy significantly faster bulk operations!
