@@ -170,53 +170,152 @@ class SQLAlchemyOperations:
     def _bulk_insert_anime_records(
         self, session: Session, records: List[AnimeRecord]
     ) -> List[int]:
-        """Insert multiple anime records using PostgreSQL bulk operations."""
+        """Insert multiple anime records using PostgreSQL COPY FROM for maximum performance."""
         if not records:
             return []
 
-        # PostgreSQL can handle much larger batches than SQLite
-        BATCH_SIZE = 1000  # Optimal batch size for PostgreSQL
+        # Use COPY FROM for maximum performance - no batching needed
+        return self._copy_from_insert(session, records)
 
-        all_anime_ids = []
+    def _copy_from_insert(
+        self, session: Session, records: List[AnimeRecord]
+    ) -> List[int]:
+        """Use PostgreSQL COPY FROM for ultra-fast bulk insert."""
+        import io
+        from generator.models import Anime
 
-        # Process records in batches
-        for i in range(0, len(records), BATCH_SIZE):
-            batch = records[i : i + BATCH_SIZE]
+        # Get all column names from the Anime model
+        anime_columns = [
+            col.name for col in Anime.__table__.columns if col.name != "id"
+        ]
 
-            # Convert AnimeRecord objects to dicts for bulk insert
-            record_dicts = []
-            for record in batch:
-                record_dict = asdict(record)
-                # Remove None values and ensure all values are proper Python types
-                clean_dict = {}
-                for k, v in record_dict.items():
-                    if v is not None:
-                        # Ensure the value is a proper Python type, not a SQLAlchemy object
-                        if hasattr(v, "__dict__") and not isinstance(
-                            v, (str, int, float, bool, list, dict)
-                        ):
-                            # Skip complex objects that can't be serialized
-                            continue
-                        clean_dict[k] = v
-                record_dicts.append(clean_dict)
+        # Convert records to clean dicts and collect unique identifiers for ID lookup
+        record_dicts = []
+        unique_identifiers = []  # (title, myanimelist) pairs for ID lookup
 
-            # Use SQLAlchemy 2.0 recommended approach for bulk insert
-            stmt = insert(Anime).returning(Anime.id)
-            result = session.execute(stmt, record_dicts)
+        for record in records:
+            record_dict = asdict(record)
+            # Remove None values and ensure all values are proper Python types
+            clean_dict = {}
+            for col_name in anime_columns:
+                value = record_dict.get(col_name)
+                if value is not None:
+                    # Ensure the value is a proper Python type
+                    if hasattr(value, "__dict__") and not isinstance(
+                        value, (str, int, float, bool, list, dict)
+                    ):
+                        continue
+                    clean_dict[col_name] = value
+                else:
+                    clean_dict[col_name] = None
 
-            # Get the inserted IDs
-            anime_ids = [row[0] for row in result]
-            all_anime_ids.extend(anime_ids)
+            record_dicts.append(clean_dict)
+            # Store unique identifiers for ID lookup (title is required, myanimelist is optional)
+            unique_identifiers.append(
+                (record.title, getattr(record, "myanimelist", None))
+            )
+
+        # Create TSV data in memory
+        tsv_data = io.StringIO()
+
+        # Write header
+        tsv_data.write("\t".join(anime_columns) + "\n")
+
+        # Write data rows
+        for record_dict in record_dicts:
+            row_values = []
+            for col_name in anime_columns:
+                value = record_dict[col_name]
+                if value is None:
+                    row_values.append("\\N")  # PostgreSQL NULL representation
+                elif isinstance(value, str):
+                    # Escape tabs and newlines in strings
+                    escaped = (
+                        value.replace("\t", "\\t")
+                        .replace("\n", "\\n")
+                        .replace("\r", "\\r")
+                    )
+                    row_values.append(escaped)
+                else:
+                    row_values.append(str(value))
+            tsv_data.write("\t".join(row_values) + "\n")
+
+        tsv_data.seek(0)
+
+        # Use raw psycopg2 connection for COPY FROM
+        raw_conn = session.connection().connection
+        cursor = raw_conn.cursor()
+        try:
+            cursor.copy_expert(
+                f"COPY anime ({','.join(anime_columns)}) FROM STDIN WITH (FORMAT text, DELIMITER E'\\t', NULL '\\\\N')",
+                tsv_data,
+            )
+        finally:
+            cursor.close()
+
+        pprint.print(
+            Platform.SYSTEM,
+            Status.INFO,
+            f"Bulk inserted {len(records)} records using COPY FROM",
+        )
+
+        # Get inserted IDs by querying using unique identifiers
+        return self._get_inserted_ids(session, unique_identifiers)
+
+    def _get_inserted_ids(
+        self, session: Session, unique_identifiers: List[Tuple[str, str]]
+    ) -> List[int]:
+        """Get IDs of inserted records using unique identifiers."""
+        # Build a query to get IDs for all inserted records
+        # We'll use title and myanimelist as unique identifiers
+
+        anime_ids = []
+
+        # Process in batches to avoid huge IN clauses
+        BATCH_SIZE = 1000
+        for i in range(0, len(unique_identifiers), BATCH_SIZE):
+            batch = unique_identifiers[i : i + BATCH_SIZE]
+
+            # Separate records with and without myanimelist IDs
+            mal_records = [
+                (title, mal_id) for title, mal_id in batch if mal_id is not None
+            ]
+            title_only_records = [title for title, mal_id in batch if mal_id is None]
+
+            batch_ids = []
+
+            # Query records that have myanimelist IDs (more reliable)
+            if mal_records:
+                mal_ids = [mal_id for _, mal_id in mal_records]
+                result = session.execute(
+                    select(Anime.id).where(Anime.myanimelist.in_(mal_ids))
+                )
+                batch_ids.extend([row[0] for row in result])
+
+            # Query records without myanimelist IDs (use title)
+            if title_only_records:
+                result = session.execute(
+                    select(Anime.id).where(Anime.title.in_(title_only_records))
+                )
+                batch_ids.extend([row[0] for row in result])
+
+            anime_ids.extend(batch_ids)
 
             # Log progress for large batches
-            if len(records) > BATCH_SIZE:
+            if len(unique_identifiers) > BATCH_SIZE:
                 pprint.print(
                     Platform.SYSTEM,
                     Status.INFO,
-                    f"Inserted batch {i // BATCH_SIZE + 1}/{(len(records) + BATCH_SIZE - 1) // BATCH_SIZE}",
+                    f"Retrieved IDs for batch {i // BATCH_SIZE + 1}/{(len(unique_identifiers) + BATCH_SIZE - 1) // BATCH_SIZE}",
                 )
 
-        return all_anime_ids
+        pprint.print(
+            Platform.SYSTEM,
+            Status.INFO,
+            f"Retrieved {len(anime_ids)} IDs for inserted records",
+        )
+
+        return anime_ids
 
     def _bulk_update_anime_records(
         self, session: Session, updates: List[Tuple[int, AnimeRecord]]
