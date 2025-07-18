@@ -373,20 +373,42 @@ class DataMatcher:
         if not silveryasha_data:
             return
 
+        pprint.print(
+            Platform.SILVERYASHA,
+            Status.INFO,
+            f"Processing {len(silveryasha_data)} SilverYasha items",
+        )
+
         linked = 0
         unlinked = []
 
         # Process each SilverYasha item
-        for sy_item in silveryasha_data:
+        for i, sy_item in enumerate(silveryasha_data):
+            if i % 1000 == 0:
+                pprint.print(
+                    Platform.SILVERYASHA,
+                    Status.INFO,
+                    f"Processed {i}/{len(silveryasha_data)} items",
+                )
+            
             mal_id = sy_item.get("mal_id")
             matched = False
 
             # Try MAL ID match first
-            if mal_id and int(mal_id) in mal_lookup:
-                record = mal_lookup[int(mal_id)]
-                record.silveryasha = sy_item["id"]
-                linked += 1
-                matched = True
+            if mal_id:
+                try:
+                    mal_id_int = int(mal_id)
+                    if mal_id_int in mal_lookup:
+                        record = mal_lookup[mal_id_int]
+                        record.silveryasha = sy_item["id"]
+                        linked += 1
+                        matched = True
+                except (ValueError, TypeError) as e:
+                    pprint.print(
+                        Platform.SILVERYASHA,
+                        Status.WARN,
+                        f"Invalid mal_id '{mal_id}' for item {sy_item.get('title', 'unknown')}: {e}",
+                    )
             # Try title match
             elif sy_item["title"] in title_lookup:
                 record = title_lookup[sy_item["title"]]
@@ -397,14 +419,26 @@ class DataMatcher:
             if not matched:
                 unlinked.append(sy_item)
 
+        pprint.print(
+            Platform.SILVERYASHA,
+            Status.INFO,
+            f"Finished processing items. Linked: {linked}, Unlinked: {len(unlinked)}",
+        )
+
         # Fuzzy match unlinked items
         if unlinked:
             pprint.print(
                 Platform.SILVERYASHA,
                 Status.INFO,
-                f"Fuzzy matching {len(unlinked)} unlinked items",
+                f"Starting fuzzy matching for {len(unlinked)} unlinked items",
             )
             matches = self._fuzzy_match_parallel(unlinked, records, threshold=95)
+            
+            pprint.print(
+                Platform.SILVERYASHA,
+                Status.INFO,
+                f"Fuzzy matching completed. Found {len(matches)} matches",
+            )
 
             for sy_item, record in matches:
                 record.silveryasha = sy_item["id"]
