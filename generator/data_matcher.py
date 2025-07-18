@@ -7,7 +7,6 @@ import json
 import os
 from typing import List, Dict, Optional, Tuple
 from multiprocessing import Pool, cpu_count
-from dataclasses import asdict
 
 from fuzzywuzzy import fuzz
 from slugify import slugify
