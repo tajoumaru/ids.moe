@@ -1,5 +1,8 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2025 tajoumaru
+
 """
-Status file updater for the AnimeAPI.
+Status file updater for ids.moe.
 Updates api/status.json with current statistics and metadata.
 """
 

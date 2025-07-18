@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2025 tajoumaru
+
 """
 Main entry point for the SQLAlchemy-based anime data pipeline.
 Can be run as: python -m generator [command] [options]

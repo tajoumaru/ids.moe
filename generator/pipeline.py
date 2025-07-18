@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2025 tajoumaru
+
 """
 Main SQLAlchemy-based pipeline for anime data processing.
 Replaces the turso-based implementation with SQLAlchemy + libsql for better performance.

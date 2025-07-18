@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2025 tajoumaru
+
 """
 SQLAlchemy models for anime database.
 Defines ORM models for all database tables.

@@ -1,3 +1,10 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright 2025 tajoumaru
+
+// This file is part of 'ids.moe'. It is a derivative work of
+// code from the 'animeApi' project by 'nattadasu'. The original license notices
+// are preserved in the `NOTICE` file in the root of this repository.
+
 package handler
 
 import (
@@ -136,7 +143,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	// Route handling
 	switch {
 	case path == "/":
-		http.Redirect(w, r, "https://github.com/nattadasu/animeApi", http.StatusFound)
+		http.Redirect(w, r, "https://github.com/tajoumaru/ids.moe", http.StatusFound)
 		return
 
 	case path == "/status":

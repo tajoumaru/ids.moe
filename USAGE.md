@@ -1,8 +1,8 @@
-# AnimeAPI Pipeline Usage Guide
+# ids.moe Pipeline Usage Guide
 
 ## Overview
 
-The AnimeAPI pipeline is a comprehensive data processing system that downloads, processes, and syncs anime data from multiple sources to a PostgreSQL database and Redis/KV store.
+The ids.moe pipeline is a comprehensive data processing system that downloads, processes, and syncs anime data from multiple sources to a PostgreSQL database and Redis/KV store.
 
 ## CLI Commands
 
@@ -114,7 +114,7 @@ All configuration is primarily done through environment variables. Command-line 
 #### Database Configuration
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL database URL | `postgresql://user:pass@localhost:5432/animeapi` |
+| `DATABASE_URL` | PostgreSQL database URL | `postgresql://user:pass@localhost:5432/ids.moe` |
 
 #### Cache Configuration
 | Variable | Description | Default |
@@ -178,15 +178,15 @@ The `DATABASE_URL` must be a PostgreSQL connection string:
 **Format**: `postgresql://username:password@host:port/database`
 
 **Examples**:
-- **Local PostgreSQL**: `postgresql://user:pass@localhost:5432/animeapi`
-- **With SSL**: `postgresql://user:pass@host:5432/animeapi?sslmode=require`
-- **Serverless PostgreSQL**: `postgresql://user:pass@serverless-db.example.com:5432/animeapi?sslmode=require`
+- **Local PostgreSQL**: `postgresql://user:pass@localhost:5432/ids.moe`
+- **With SSL**: `postgresql://user:pass@host:5432/ids.moe?sslmode=require`
+- **Serverless PostgreSQL**: `postgresql://user:pass@serverless-db.example.com:5432/ids.moe?sslmode=require`
 
 ### Recommended Serverless PostgreSQL Providers
 
 1. **Neon** (https://neon.tech)
    ```
-   DATABASE_URL=postgresql://user:pass@ep-xxx-xxx.us-east-1.aws.neon.tech/animeapi?sslmode=require
+   DATABASE_URL=postgresql://user:pass@ep-xxx-xxx.us-east-1.aws.neon.tech/ids.moe?sslmode=require
    ```
 
 2. **Supabase** (https://supabase.com)
@@ -196,7 +196,7 @@ The `DATABASE_URL` must be a PostgreSQL connection string:
 
 3. **Vercel Postgres** (https://vercel.com/storage/postgres)
    ```
-   DATABASE_URL=postgresql://user:pass@ep-xxx-xxx.us-east-1.postgres.vercel-storage.com/animeapi?sslmode=require
+   DATABASE_URL=postgresql://user:pass@ep-xxx-xxx.us-east-1.postgres.vercel-storage.com/ids.moe?sslmode=require
    ```
 
 4. **Railway** (https://railway.app)
@@ -206,7 +206,7 @@ The `DATABASE_URL` must be a PostgreSQL connection string:
 
 5. **AWS RDS Serverless** (https://aws.amazon.com/rds/serverless/)
    ```
-   DATABASE_URL=postgresql://user:pass@cluster.cluster-xxx.us-east-1.rds.amazonaws.com:5432/animeapi
+   DATABASE_URL=postgresql://user:pass@cluster.cluster-xxx.us-east-1.rds.amazonaws.com:5432/ids.moe
    ```
 
 ## Example Workflows
@@ -215,7 +215,7 @@ The `DATABASE_URL` must be a PostgreSQL connection string:
 
 ```bash
 # Set up environment variables
-export DATABASE_URL="postgresql://user:pass@localhost:5432/animeapi"
+export DATABASE_URL="postgresql://user:pass@localhost:5432/ids.moe"
 export CACHE_DIR="cache"
 export GITHUB_TOKEN="ghp_your_token_here"
 export REDIS_URL="redis://localhost:6379"
@@ -228,7 +228,7 @@ uv run generator full
 
 ```bash
 # Set PostgreSQL and Redis credentials
-export DATABASE_URL="postgresql://user:pass@ep-xxx-xxx.us-east-1.aws.neon.tech/animeapi?sslmode=require"
+export DATABASE_URL="postgresql://user:pass@ep-xxx-xxx.us-east-1.aws.neon.tech/ids.moe?sslmode=require"
 export KV_REST_API_URL="https://your-redis.upstash.io"
 export KV_REST_API_TOKEN="your-upstash-token"
 

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2025 tajoumaru
+
 """
 Database operations using SQLAlchemy ORM with PostgreSQL.
 Implements bulk operations and proper transaction handling.

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2025 tajoumaru
+
 """
 Cache-aware downloader for GitHub files and external sources.
 Downloads files only when they've changed, maintaining persistent cache.

@@ -1,4 +1,4 @@
-module animeapi-go
+module ids-moe-api
 
 go 1.24.4
 

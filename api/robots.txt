@@ -1,4 +1,4 @@
-# robots.txt file for https://animeapi.my.id
+# robots.txt file for https://ids.moe
 
 User-agent: *
 Disallow: /

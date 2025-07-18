@@ -1,10 +1,13 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2025 tajoumaru
+
 """
 Incremental KV Store ingestion module - supports both regular Redis and Upstash Redis
 """
 
 import os
 import json
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Union
 from dataclasses import asdict
 
 from generator.const import pprint
@@ -305,56 +308,6 @@ class IncrementalKVIngest:
                 f"Error bulk fetching anime data: {e}",
             )
             return {}
-
-    def _get_anime_data(self, db_ops, anime_id: int) -> Optional[AnimeRecord]:
-        """Get anime data from database by ID (legacy method - use bulk method when possible)"""
-        try:
-            with db_ops.Session() as session:
-                from sqlalchemy import select
-                from generator.models import Anime
-
-                result = session.execute(
-                    select(Anime).where(Anime.id == anime_id)
-                ).scalar_one_or_none()
-
-                if result:
-                    # Convert ORM object to AnimeRecord
-                    return AnimeRecord(
-                        title=result.title,
-                        myanimelist=result.myanimelist,
-                        anilist=result.anilist,
-                        anidb=result.anidb,
-                        kitsu=result.kitsu,
-                        animenewsnetwork=result.animenewsnetwork,
-                        animeplanet=result.animeplanet,
-                        anisearch=result.anisearch,
-                        livechart=result.livechart,
-                        notify=result.notify,
-                        simkl=result.simkl,
-                        shikimori=result.shikimori,
-                        kaize=result.kaize,
-                        kaize_id=result.kaize_id,
-                        nautiljon=result.nautiljon,
-                        nautiljon_id=result.nautiljon_id,
-                        otakotaku=result.otakotaku,
-                        silveryasha=result.silveryasha,
-                        shoboi=result.shoboi,
-                        annict=result.annict,
-                        trakt=result.trakt,
-                        trakt_type=result.trakt_type,
-                        trakt_season=result.trakt_season,
-                        imdb=result.imdb,
-                        themoviedb=result.themoviedb,
-                        data_hash=result.data_hash,
-                    )
-                return None
-        except Exception as e:
-            pprint.print(
-                Platform.SYSTEM,
-                Status.ERR,
-                f"Error fetching anime data for ID {anime_id}: {e}",
-            )
-            return None
 
     def _execute_batch(self, batch_data: Dict[str, Union[str, None]]) -> None:
         """Execute a batch of KV operations"""

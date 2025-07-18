@@ -1,13 +1,23 @@
 services:
+  postgres:
+    container_name: postgres
+    image: postgres
+    restart: always
+    shm_size: 128mb
+    environment:
+        POSTGRES_PASSWORD: postgres
+    volumes:
+    - pgdata:/var/lib/postgresql/data/pgdata
   dragonfly:
     container_name: dragonfly
     image: 'docker.dragonflydb.io/dragonflydb/dragonfly'
     ulimits:
-      memlock: -1
+    memlock: -1
     ports:
-      - "6379:6379"
+    - "6379:6379"
     volumes:
-      - dragonflydata:/data
-volumes:
-  dragonflydata:
+    - dragonflydata:/data
 
+volumes:
+  pgdata:
+  dragonflydata:

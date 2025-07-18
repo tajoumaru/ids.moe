@@ -1,3 +1,10 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Copyright 2025 tajoumaru
+
+# This file is part of 'ids.moe'. It is a derivative work of
+# code from the 'animeApi' project by 'nattadasu'. The original license notices
+# are preserved in the `NOTICE` file in the root of this repository.
+
 import os
 from typing import Any
 
@@ -105,11 +112,11 @@ pprint = PrettyPrint()
 """PrettyPrint class instance"""
 
 attribution: dict[str, Any] = {
-    "mainrepo": "https://github.com/nattadasu/animeApi/tree/v3",
+    "mainrepo": "https://github.com/tajoumaru/ids.moe",
     "updated": {"timestamp": 0, "iso": ""},
     "contributors": [""],
     "sources": [
-        "kawaiioverflow/arm",
+        "nattadasu/animeApikawaiioverflow/arm",
         "manami-project/anime-offline-database",
         "rensetsu/db.rensetsu.public-dump",
         "rensetsu/db.trakt.anitrakt",
@@ -117,8 +124,8 @@ attribution: dict[str, Any] = {
         "https://nautiljon.com",
         "https://otakotaku.com",
     ],
-    "license": "AGPL-3.0-only AND MIT AND CC0-1.0+",
-    "website": "https://animeapi.my.id",
+    "license": "AGPL-3.0-only",
+    "website": "https://ids.moe",
     "counts": {
         "anidb": 0,
         "anilist": 0,
