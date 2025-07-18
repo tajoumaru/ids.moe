@@ -47,10 +47,10 @@ class DataMatcher:
         self._combine_fribb_data(records, anidb_lookup)
 
         # Phase 2: Link data using fuzzy matching
+        self._link_silveryasha_data(records, mal_lookup, title_lookup)
         self._link_kaize_data(records, title_lookup)
         self._link_nautiljon_data(records, title_lookup)
         self._link_otakotaku_data(records, title_lookup)
-        self._link_silveryasha_data(records, mal_lookup, title_lookup)
 
         # Phase 3: Apply manual mappings
         self._apply_manual_mappings(records, title_lookup)
