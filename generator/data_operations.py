@@ -4,9 +4,8 @@ Implements bulk operations and proper transaction handling.
 """
 
 from typing import List, Dict, Tuple
-from sqlalchemy import create_engine, Engine, select, update, delete, func
+from sqlalchemy import create_engine, Engine, select, update, delete, func, insert
 from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.dialects.postgresql import insert as pg_insert
 from dataclasses import asdict
 
 from generator.models import Base, Anime, ChangeLog, ManualMapping
@@ -188,12 +187,21 @@ class SQLAlchemyOperations:
             record_dicts = []
             for record in batch:
                 record_dict = asdict(record)
-                # Remove None values to use database defaults
-                record_dict = {k: v for k, v in record_dict.items() if v is not None}
-                record_dicts.append(record_dict)
+                # Remove None values and ensure all values are proper Python types
+                clean_dict = {}
+                for k, v in record_dict.items():
+                    if v is not None:
+                        # Ensure the value is a proper Python type, not a SQLAlchemy object
+                        if hasattr(v, "__dict__") and not isinstance(
+                            v, (str, int, float, bool, list, dict)
+                        ):
+                            # Skip complex objects that can't be serialized
+                            continue
+                        clean_dict[k] = v
+                record_dicts.append(clean_dict)
 
-            # Use PostgreSQL-specific bulk insert with RETURNING
-            stmt = pg_insert(Anime).values(record_dicts)
+            # Use standard SQLAlchemy bulk insert with RETURNING
+            stmt = insert(Anime).values(record_dicts)
             result = session.execute(stmt.returning(Anime.id))
 
             # Get the inserted IDs
@@ -229,9 +237,18 @@ class SQLAlchemyOperations:
             for anime_id, record in batch:
                 record_dict = asdict(record)
                 record_dict["id"] = anime_id  # Include the primary key for bulk update
-                # Remove None values to use database defaults
-                record_dict = {k: v for k, v in record_dict.items() if v is not None}
-                update_values.append(record_dict)
+                # Remove None values and ensure all values are proper Python types
+                clean_dict = {}
+                for k, v in record_dict.items():
+                    if v is not None:
+                        # Ensure the value is a proper Python type, not a SQLAlchemy object
+                        if hasattr(v, "__dict__") and not isinstance(
+                            v, (str, int, float, bool, list, dict)
+                        ):
+                            # Skip complex objects that can't be serialized
+                            continue
+                        clean_dict[k] = v
+                update_values.append(clean_dict)
 
             if update_values:
                 # Use PostgreSQL-specific bulk update with VALUES clause
@@ -291,8 +308,8 @@ class SQLAlchemyOperations:
                 {"anime_id": anime_id, "change_type": change_type} for anime_id in batch
             ]
 
-            # Use PostgreSQL bulk insert for change logs
-            stmt = pg_insert(ChangeLog).values(change_logs)
+            # Use standard SQLAlchemy bulk insert for change logs
+            stmt = insert(ChangeLog).values(change_logs)
             session.execute(stmt)
 
             # Log progress for large batches
