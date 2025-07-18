@@ -372,7 +372,6 @@ class DataMatcher:
         if not silveryasha_data:
             return
 
-
         linked = 0
         unlinked = []
 
@@ -406,10 +405,7 @@ class DataMatcher:
                 Status.INFO,
                 f"Starting fuzzy matching for {len(unlinked)} unlinked items",
             )
-            matches = self._fuzzy_match_parallel(
-                unlinked, records, threshold=95
-            )
-
+            matches = self._fuzzy_match_parallel(unlinked, records, threshold=95)
 
             for sy_item, record in matches:
                 record.silveryasha = sy_item["id"]
