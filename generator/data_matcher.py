@@ -390,7 +390,7 @@ class DataMatcher:
                     Status.INFO,
                     f"Processed {i}/{len(silveryasha_data)} items",
                 )
-            
+
             mal_id = sy_item.get("mal_id")
             matched = False
 
@@ -433,7 +433,7 @@ class DataMatcher:
                 f"Starting fuzzy matching for {len(unlinked)} unlinked items",
             )
             matches = self._fuzzy_match_parallel(unlinked, records, threshold=95)
-            
+
             pprint.print(
                 Platform.SILVERYASHA,
                 Status.INFO,
