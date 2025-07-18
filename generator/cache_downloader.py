@@ -495,7 +495,7 @@ class CacheDownloader:
             # Save to cache
             file_path = os.path.join(self.cache_dir, "kaize.json")
             with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+                json.dump(data, f, ensure_ascii=False)
 
             # Compute hash and update cache
             file_hash = self._compute_file_hash(file_path)
@@ -524,7 +524,7 @@ class CacheDownloader:
             # Save to cache
             file_path = os.path.join(self.cache_dir, "nautiljon.json")
             with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+                json.dump(data, f, ensure_ascii=False)
 
             # Compute hash and update cache
             file_hash = self._compute_file_hash(file_path)
@@ -553,7 +553,7 @@ class CacheDownloader:
             # Save to cache
             file_path = os.path.join(self.cache_dir, "otakotaku.json")
             with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+                json.dump(data, f, ensure_ascii=False)
 
             # Compute hash and update cache
             file_hash = self._compute_file_hash(file_path)
