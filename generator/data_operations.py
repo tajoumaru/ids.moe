@@ -224,7 +224,7 @@ class SQLAlchemyOperations:
             for col_name in anime_columns:
                 value = record_dict[col_name]
                 if value is None:
-                    row_values.append("\\N")  # PostgreSQL NULL representation
+                    row_values.append("")  # Empty string for NULL
                 elif isinstance(value, str):
                     # Escape tabs and newlines in strings
                     escaped = (
@@ -244,7 +244,7 @@ class SQLAlchemyOperations:
         cursor = raw_conn.cursor()
         try:
             cursor.copy_expert(
-                f"COPY anime ({','.join(anime_columns)}) FROM STDIN WITH (FORMAT text, DELIMITER E'\\t', NULL '\\\\N')",
+                f"COPY anime ({','.join(anime_columns)}) FROM STDIN WITH (FORMAT text, DELIMITER E'\\t', NULL '')",
                 tsv_data,
             )
         finally:
