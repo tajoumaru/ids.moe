@@ -184,9 +184,10 @@ class SQLAlchemyOperations:
         import io
         from generator.models import Anime
 
-        # Get all column names from the Anime model
+        # Get all column names from the Anime model, excluding auto-generated columns
         anime_columns = [
-            col.name for col in Anime.__table__.columns if col.name != "id"
+            col.name for col in Anime.__table__.columns 
+            if col.name not in ("id", "created_at", "updated_at")
         ]
 
         # Convert records to clean dicts and collect unique identifiers for ID lookup
