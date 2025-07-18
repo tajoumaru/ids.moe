@@ -169,26 +169,27 @@ class IncrementalKVIngest:
             f"Processing {len(changes)} incremental changes to KV store",
         )
 
+        # Group changes by type for bulk processing
+        insert_updates = [c for c in changes if c.change_type in ("insert", "update")]
+        deletes = [c for c in changes if c.change_type == "delete"]
+
         batch_data: Dict[str, Union[str, None]] = {}
-        batch_size = (
-            1000 if self.is_upstash else 100
-        )  # Upstash can handle larger batches
+        
+        # Much larger batch sizes for KV operations
+        batch_size = 10000 if self.is_upstash else 5000
 
-        processed_count = 0
-        batch_count = 0
-        total_batches = (len(changes) + batch_size - 1) // batch_size
+        # Process deletes (simple - just mark anime IDs as deleted)
+        for change in deletes:
+            batch_data[str(change.anime_id)] = None
 
-        for i, change in enumerate(changes):
-            anime_id = change.anime_id
-            change_type = change.change_type
-
-            if change_type == "delete":
-                # For deletions, we need to find and remove all keys that map to this internal ID
-                # This is complex because we need to scan for keys - for now, we'll mark the internal ID as deleted
-                batch_data[str(anime_id)] = None  # None means delete
-            else:
-                # For inserts/updates, get the current anime data
-                anime_data = self._get_anime_data(db_ops, anime_id)
+        # Process inserts/updates in bulk
+        if insert_updates:
+            anime_data_bulk = self._get_anime_data_bulk(db_ops, [c.anime_id for c in insert_updates])
+            
+            for change in insert_updates:
+                anime_id = change.anime_id
+                anime_data = anime_data_bulk.get(anime_id)
+                
                 if anime_data:
                     # Generate platform keys
                     platform_keys = self._generate_platform_keys(anime_data, anime_id)
@@ -200,37 +201,107 @@ class IncrementalKVIngest:
                     # Add the complete data
                     batch_data[str(anime_id)] = json.dumps(asdict(anime_data))
 
-            processed_count += 1
+        # Execute in large batches
+        processed_count = 0
+        batch_count = 0
+        total_keys = len(batch_data)
+        total_batches = (total_keys + batch_size - 1) // batch_size
 
-            # Execute batch when it gets large enough
-            if len(batch_data) >= batch_size:
-                batch_count += 1
-                pprint.print(
-                    Platform.SYSTEM,
-                    Status.INFO,
-                    f"Processing KV batch {batch_count}/{total_batches} ({processed_count}/{len(changes)} changes)",
-                )
-                self._execute_batch(batch_data)
-                batch_data = {}
+        if total_keys == 0:
+            pprint.print(Platform.SYSTEM, Status.INFO, "No KV operations to execute")
+            return
 
-        # Execute remaining batch
-        if batch_data:
+        pprint.print(
+            Platform.SYSTEM,
+            Status.INFO,
+            f"Executing {total_keys} KV operations in {total_batches} batches",
+        )
+
+        batch_items = list(batch_data.items())
+        for i in range(0, total_keys, batch_size):
             batch_count += 1
+            batch_slice = dict(batch_items[i:i + batch_size])
+            
             pprint.print(
                 Platform.SYSTEM,
                 Status.INFO,
-                f"Processing final KV batch {batch_count}/{total_batches} ({processed_count}/{len(changes)} changes)",
+                f"Processing KV batch {batch_count}/{total_batches} ({len(batch_slice)} operations)",
             )
-            self._execute_batch(batch_data)
+            self._execute_batch(batch_slice)
+            processed_count += len(batch_slice)
 
         pprint.print(
             Platform.SYSTEM,
             Status.PASS,
-            f"Processed {len(changes)} changes to KV store",
+            f"Processed {len(changes)} changes to KV store ({processed_count} operations)",
         )
 
+    def _get_anime_data_bulk(self, db_ops, anime_ids: List[int]) -> Dict[int, AnimeRecord]:
+        """Get anime data from database by IDs in bulk - much faster than individual queries"""
+        result_dict = {}
+        
+        if not anime_ids:
+            return result_dict
+            
+        try:
+            with db_ops.Session() as session:
+                from sqlalchemy import select
+                from generator.models import Anime
+
+                # Single query to get all anime records
+                results = session.execute(
+                    select(Anime).where(Anime.id.in_(anime_ids))
+                ).scalars().all()
+
+                for result in results:
+                    # Convert ORM object to AnimeRecord
+                    anime_record = AnimeRecord(
+                        title=result.title,
+                        myanimelist=result.myanimelist,
+                        anilist=result.anilist,
+                        anidb=result.anidb,
+                        kitsu=result.kitsu,
+                        animenewsnetwork=result.animenewsnetwork,
+                        animeplanet=result.animeplanet,
+                        anisearch=result.anisearch,
+                        livechart=result.livechart,
+                        notify=result.notify,
+                        simkl=result.simkl,
+                        shikimori=result.shikimori,
+                        kaize=result.kaize,
+                        kaize_id=result.kaize_id,
+                        nautiljon=result.nautiljon,
+                        nautiljon_id=result.nautiljon_id,
+                        otakotaku=result.otakotaku,
+                        silveryasha=result.silveryasha,
+                        shoboi=result.shoboi,
+                        annict=result.annict,
+                        trakt=result.trakt,
+                        trakt_type=result.trakt_type,
+                        trakt_season=result.trakt_season,
+                        imdb=result.imdb,
+                        themoviedb=result.themoviedb,
+                        data_hash=result.data_hash,
+                    )
+                    result_dict[result.id] = anime_record
+                    
+                pprint.print(
+                    Platform.SYSTEM,
+                    Status.INFO,
+                    f"Bulk fetched {len(result_dict)} anime records",
+                )
+                return result_dict
+                
+        except Exception as e:
+            pprint.print(
+                Platform.SYSTEM,
+                Status.ERR,
+                f"Error bulk fetching anime data: {e}",
+            )
+            return {}
+
     def _get_anime_data(self, db_ops, anime_id: int) -> Optional[AnimeRecord]:
-        """Get anime data from database by ID"""
+        """Get anime data from database by ID (legacy method - use bulk method when possible)"""
         try:
             with db_ops.Session() as session:
                 from sqlalchemy import select
