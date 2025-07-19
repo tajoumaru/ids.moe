@@ -6,11 +6,12 @@ This project is forked from [nattadasu/animeApi](https://github.com/nattadasu/an
 
 ## 🚀 Key Improvements
 
-- **Much Faster API Response**: Go-based API with Redis KV store
+- **Over 100x Faster API Response**: Go-based API with Redis KV store
+  - Average response time of **~0.003ms** (down from ~0.400ms on `animeapi.my.id`)
 - **Much Faster Data Processing**: PostgreSQL with `COPY FROM` insertions and multiprocessing
 - **Intelligent Caching**: Only downloads & processes changed data with hash-based detection
 - **Space Efficient**: Two-tier Redis structure (300k ID mappings → internal IDs → full objects)
-- **Serverless Ready**: Meant to deploy with Vercel, Neon & Upstash out of the box
+- **Serverless Ready & Free**: Meant to deploy with Vercel, Neon & Upstash Free Tiers out of the box
 - **Modern Pipeline**: GitHub Actions with dependency caching and incremental updates
 
 ## 🏗️ Architecture
@@ -18,7 +19,9 @@ This project is forked from [nattadasu/animeApi](https://github.com/nattadasu/an
 ### API Layer (Go)
 - **Runtime**: Go with Redis client
 - **Hosting**: Vercel Functions
-- **Response Time**: ~100ms typical response
+- **Response Time**: ~0.003ms typical response
+  - Dependent on region
+  - The public instance `ids.moe` has local cdn in US West, US East and Frankfurt
 
 ### Data Pipeline (Python)
 - **Database**: PostgreSQL (remote or local)
@@ -35,7 +38,7 @@ This project is forked from [nattadasu/animeApi](https://github.com/nattadasu/an
 ## 📊 Supported Platforms
 
 |           Platform |  2K   | Aliases                                                                                         |
-| -----------------: | :---: | ----------------------------------------------------------------------------------------------- |
+| -----------------: | :---: | :---------------------------------------------------------------------------------------------- |
 |            `anidb` | `ad`  | `adb`, `anidb.net`                                                                              |
 |          `anilist` | `al`  | `anilist.co`                                                                                    |
 | `animenewsnetwork` | `an`  | `ann`, `animenewsnetwork.com`                                                                   |
@@ -115,10 +118,7 @@ GET /status
 GET /heartbeat
 ```
 
-`{"status":"OK","code":200,"request_time":"0.129s","response_time":"0.129s","request_epoch":1752876928}`
-> ^ The delta between request_time and response_time is the processing time. In my testing always 0.000s\
-> I've found that the only latency is the network request latency to Vercel. The rest is instant.
-
+`{"status":"OK","code":200,"request_time":"0.003s","response_time":"0.003s","request_epoch":1752908838}`
 
 ### Redirect to Platform
 ```http
@@ -145,9 +145,11 @@ All platforms support multiple aliases (case-insensitive):
 4. Deploy it (the api will not work yet)
 
 ### 3. Add Database & Redis
-In Vercel Storage tab:
+In Vercel Storage tab:\
+*Make sure to use US Washington as primary region for both*\
+*The primary region will not affect api response times, only insertion time for github actions*
 - Add **Neon PostgreSQL** database
-- Add **Upstash Redis** instance
+- Add **Upstash Redis** instance (select your location as the read region, *not as the primary region*)
 
 Both work perfectly on free tiers for this use case.
 
