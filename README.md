@@ -7,7 +7,7 @@ This project is forked from [nattadasu/animeApi](https://github.com/nattadasu/an
 ## 🚀 Key Improvements
 
 - **Over 100x Faster API Response**: Go-based API with Redis KV store
-  - Average response time of **~0.003ms** (down from ~0.400ms on `animeapi.my.id`)
+  - Average response time of **~0.003s** (down from ~0.400s on `animeapi.my.id`)
 - **Much Faster Data Processing**: PostgreSQL with `COPY FROM` insertions and multiprocessing
 - **Intelligent Caching**: Only downloads & processes changed data with hash-based detection
 - **Space Efficient**: Two-tier Redis structure (300k ID mappings → internal IDs → full objects)
@@ -19,7 +19,7 @@ This project is forked from [nattadasu/animeApi](https://github.com/nattadasu/an
 ### API Layer (Go)
 - **Runtime**: Go with Redis client
 - **Hosting**: Vercel Functions
-- **Response Time**: ~0.003ms typical response
+- **Response Time**: ~0.003s typical response
   - Dependent on region
   - The public instance `ids.moe` has local cdn in US West, US East and Frankfurt
 
