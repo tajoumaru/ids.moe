@@ -22,10 +22,6 @@ if HAS_DOTENV and os.path.isfile(".env"):
 
 
 # Environment variables for scrapers
-KAIZE_XSRF_TOKEN = os.getenv("KAIZE_XSRF_TOKEN")
-"""Kaize XSRF token"""
-KAIZE_SESSION = os.getenv("KAIZE_SESSION")
-"""Kaize session cookie"""
 KAIZE_EMAIL = os.getenv("KAIZE_EMAIL")
 """User email for Kaize login"""
 KAIZE_PASSWORD = os.getenv("KAIZE_PASSWORD")

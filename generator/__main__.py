@@ -22,8 +22,6 @@ from generator.const import (
     CACHE_DIR,
     DATABASE_URL,
     GITHUB_TOKEN,
-    KAIZE_SESSION,
-    KAIZE_XSRF_TOKEN,
     KAIZE_EMAIL,
     KAIZE_PASSWORD,
     REDIS_URL,
@@ -50,7 +48,7 @@ def check_environment_variables():
 
     # Check Kaize authentication
     kaize_vars = ["KAIZE_SESSION", "KAIZE_XSRF_TOKEN", "KAIZE_EMAIL", "KAIZE_PASSWORD"]
-    kaize_values = [KAIZE_SESSION, KAIZE_XSRF_TOKEN, KAIZE_EMAIL, KAIZE_PASSWORD]
+    kaize_values = [KAIZE_EMAIL, KAIZE_PASSWORD]
     kaize_set = all(kaize_values)
 
     if kaize_set:

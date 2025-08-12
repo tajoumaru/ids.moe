@@ -134,8 +134,6 @@ All four variables must be set to enable Kaize data collection:
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `KAIZE_SESSION` | Kaize session cookie | For Kaize data* |
-| `KAIZE_XSRF_TOKEN` | Kaize XSRF token | For Kaize data* |
 | `KAIZE_EMAIL` | Kaize login email | For Kaize data* |
 | `KAIZE_PASSWORD` | Kaize login password | For Kaize data* |
 

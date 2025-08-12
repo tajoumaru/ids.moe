@@ -22,19 +22,15 @@ from generator.prettyprint import Platform, Status
 class Kaize:
     """Kaize anime data scraper (Optimized and Session-Based)"""
 
-    def __init__(self, kaize_session: str, xsrf_token: str) -> None:
-        if not kaize_session or not xsrf_token:
-            raise ValueError("Kaize session and XSRF token cannot be empty.")
+    def __init__(self, email: str, password: str) -> None:
+        if not email or not password:
+            raise ValueError("Email and password cannot be empty.")
 
         self.base_url = "https://kaize.io"
         self.session = requests.Session()
-
-        self.session.cookies.set("kaize_session", kaize_session)
-        self.session.cookies.set("XSRF-TOKEN", xsrf_token)
         self.session.headers.update(
             {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
-                "X-XSRF-TOKEN": xsrf_token,
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
             }
         )
 
@@ -43,9 +39,67 @@ class Kaize:
         )
         self.session.mount("https://", HTTPAdapter(max_retries=retries))
 
+        # Perform login
+        self._login(email, password)
+
         pprint.print(
             Platform.KAIZE, Status.READY, "Kaize anime data scraper ready to use."
         )
+
+    def _login(self, email: str, password: str) -> None:
+        """
+        Perform login to Kaize.io using email and password.
+        """
+        pprint.print(Platform.KAIZE, Status.INFO, "Logging in to Kaize...")
+        
+        # Step 1: Get the login page to retrieve CSRF token and initial cookies
+        login_page_url = f"{self.base_url}/login"
+        try:
+            response = self.session.get(login_page_url, timeout=15)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            raise ConnectionError(f"Failed to access login page: {e}")
+        
+        # Parse CSRF token from HTML
+        soup = BeautifulSoup(response.text, "html.parser")
+        csrf_meta = soup.find("meta", {"name": "csrf-token"})
+        if not csrf_meta or not csrf_meta.get("content"):
+            raise ValueError("Failed to retrieve CSRF token from login page")
+        
+        csrf_token = csrf_meta["content"]
+        
+        # Step 2: Perform login POST request
+        login_url = f"{self.base_url}/login"
+        login_data = {
+            "_token": csrf_token,
+            "email": email,
+            "password": password,
+            "remember": "on"
+        }
+        
+        try:
+            response = self.session.post(
+                login_url, 
+                data=login_data,
+                timeout=15,
+                allow_redirects=False
+            )
+            
+            # Check if login was successful (302 redirect is expected)
+            if response.status_code == 302:
+                pprint.print(Platform.KAIZE, Status.PASS, "Successfully logged in to Kaize")
+                
+                # Extract XSRF token from cookies for future requests
+                xsrf_token = self.session.cookies.get("XSRF-TOKEN")
+                if xsrf_token:
+                    self.session.headers.update({
+                        "X-XSRF-TOKEN": xsrf_token,
+                    })
+            else:
+                raise ConnectionError(f"Login failed with status code: {response.status_code}")
+                
+        except requests.RequestException as e:
+            raise ConnectionError(f"Login request failed: {e}")
 
     def _verify_session(self) -> bool:
         pprint.print(Platform.KAIZE, Status.INFO, "Verifying session...")

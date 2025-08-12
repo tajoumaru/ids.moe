@@ -472,30 +472,26 @@ class CacheDownloader:
 
         # Get credentials from constants
         from generator.const import (
-            KAIZE_SESSION,
-            KAIZE_XSRF_TOKEN,
             KAIZE_EMAIL,
             KAIZE_PASSWORD,
         )
 
-        session = KAIZE_SESSION
-        xsrf_token = KAIZE_XSRF_TOKEN
         email = KAIZE_EMAIL
         password = KAIZE_PASSWORD
 
-        if not all([session, xsrf_token, email, password]):
+        if not all([email, password]):
             pprint.print(
                 Platform.KAIZE,
                 Status.WARN,
-                "Credentials not found in environment, skipping",
+                "Email or password not found in environment, skipping",
             )
             return None
 
         try:
-            # Initialize and run scraper
+            # Initialize and run scraper with email and password
             kaize = Kaize(
-                kaize_session=session,  # type: ignore
-                xsrf_token=xsrf_token,  # type: ignore
+                email=email,  # type: ignore
+                password=password,  # type: ignore
             )
 
             # Get data
