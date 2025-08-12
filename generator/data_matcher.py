@@ -15,7 +15,7 @@ import os
 from typing import List, Dict, Optional, Tuple
 from multiprocessing import Pool, cpu_count
 
-from fuzzywuzzy import fuzz
+from thefuzz import fuzz
 from slugify import slugify
 
 from generator.const import pprint

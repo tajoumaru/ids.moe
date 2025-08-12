@@ -5,8 +5,5 @@ indent_size = 4
 indent_style = space
 insert_final_newline = true
 
-[**.ps1]
-indent_style = tab
-
 [.github/workflows/**]
 indent_size = 2
