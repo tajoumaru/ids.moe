@@ -153,7 +153,7 @@ After deployment, note these down:
 
 ### 2. Set up PostgreSQL Database
 1. Go to [Neon](https://neon.tech) and create a free account
-2. Create a new project
+2. Create a new project (Use region us-east. Do not use your own location.)
 3. Save the connection string for later
 
 ### 3. Configure GitHub Secrets
@@ -173,13 +173,13 @@ Otherwise kaize id's will be skipped. Simply create an account on Kaize and ente
 - `KAIZE_PASSWORD`
 
 ### 4. Enable GitHub Actions
-1. Go to the Actions tab in your forked repository
+1. Go to the Actions tab in your cloned repository
 2. Enable workflows
 3. Manually trigger the "Run generator pipeline" workflow for initial data population
 
 The first run takes ~1 hour to populate all data. Subsequent runs are much faster (2-10 minutes) and run automatically every night.
 
-### 6. Verify Deployment
+### 5. Verify Deployment
 Once the GitHub Action completes, test your API:
 (Find the url below in your cloudflare worker settings)
 ```bash
@@ -191,8 +191,9 @@ curl https://your-worker.workers.dev/mal/1
 ### Prerequisites
 - Python 3.13+
 - [uv](https://github.com/astral-sh/uv) package manager
+- Node.js 18+
 - PostgreSQL
-- Redis
+- Docker (optional, for local database)
 
 ### Setup
 ```bash
@@ -207,7 +208,7 @@ cp .env.example .env
 uvx lefthook install
 
 # Start local services (optional)
-docker-compose up -d
+docker compose up -d
 ```
 
 ### Available Commands
@@ -218,7 +219,7 @@ uv run generator
 # Individual phases
 uv run generator download    # Download data
 uv run generator process     # Process into database
-uv run generator ingest      # Sync to Redis
+uv run generator ingest      # Sync to Cloudflare KV
 
 # Utilities
 uv run generator status      # Show statistics
@@ -232,10 +233,17 @@ uvx ruff format             # Formatting
 
 ### More usage examples and other commands in [USAGE.md](USAGE.md)
 
-### Go API Development
+### TypeScript API Development
 ```bash
-cd api
-go run index.go
+cd api-ts
+npm install
+npm run dev   # Local development with Wrangler
+```
+
+### Deploy API to Cloudflare
+```bash
+cd api-ts
+npm run deploy
 ```
 
 ## 🏛️ Data Pipeline Details
