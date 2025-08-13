@@ -1,39 +1,37 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-
-  // --- BASE CONFIGURATION (for the Deploy Button) ---
-
-  "name": "ids-moe-api-ts",
-  "main": "src/index.ts",
-  "compatibility_date": "2025-08-03",
-  "observability": {
-    "enabled": true
-  },
-  "assets": {
-    "directory": "assets",
-    "binding": "ASSETS"
-  },
-  "kv_namespaces": [
-    {
-      "binding": "IDS_KV"
-    }
-  ],
-
-  // --- IDS.MOE SPECIFIC PRODUCTION ENVIRONMENT (IGNORE) ---
-  "env": {
-    "tajoumaru": {
-      "kv_namespaces": [
-        {
-          "binding": "IDS_KV",
-          "id": "aa22665871054e7bb136507c62e93b00"
-        }
-      ],
-      "routes": [
-        {
-          "pattern": "ids.moe/*",
-          "zone_name": "ids.moe"
-        }
-      ]
-    }
-  }
+	"$schema": "node_modules/wrangler/config-schema.json",
+	// --- BASE CONFIGURATION (for the Deploy Button) ---
+	"name": "ids-moe",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-08-03",
+	"observability": {
+		"enabled": true
+	},
+	"assets": {
+		"directory": "assets",
+		"binding": "ASSETS"
+	},
+	"kv_namespaces": [
+		{
+			"binding": "IDS_KV",
+			"id": "example"
+		}
+	],
+	// --- IDS.MOE SPECIFIC PRODUCTION ENVIRONMENT (IGNORE) ---
+	"env": {
+		"tajoumaru": {
+			"kv_namespaces": [
+				{
+					"binding": "IDS_KV",
+					"id": "aa22665871054e7bb136507c62e93b00"
+				}
+			],
+			"routes": [
+				{
+					"pattern": "ids.moe/*",
+					"zone_name": "ids.moe"
+				}
+			]
+		}
+	}
 }
