@@ -24,10 +24,6 @@ from generator.const import (
     GITHUB_TOKEN,
     KAIZE_EMAIL,
     KAIZE_PASSWORD,
-    REDIS_URL,
-    REDIS_HOST,
-    KV_REST_API_URL,
-    KV_REST_API_TOKEN,
 )
 from generator.prettyprint import Platform, Status
 
@@ -62,23 +58,6 @@ def check_environment_variables():
         missing = [var for var, val in zip(kaize_vars, kaize_values) if not val]
         for var in missing:
             pprint.print(Platform.SYSTEM, Status.WARN, f"  - {var}")
-
-    # Check Redis/KV environment variables
-    if KV_REST_API_URL and KV_REST_API_TOKEN:
-        pprint.print(Platform.SYSTEM, Status.PASS, "Upstash Redis credentials are set")
-    elif REDIS_URL or REDIS_HOST:
-        pprint.print(Platform.SYSTEM, Status.PASS, "Regular Redis credentials are set")
-    else:
-        pprint.print(
-            Platform.SYSTEM,
-            Status.WARN,
-            "No Redis credentials set (KV ingestion will be skipped)",
-        )
-        pprint.print(
-            Platform.SYSTEM,
-            Status.WARN,
-            "  Set either REDIS_URL/REDIS_HOST or KV_REST_API_URL/KV_REST_API_TOKEN",
-        )
 
     # Check PostgreSQL configuration
     if DATABASE_URL:
@@ -172,16 +151,6 @@ def run_full_pipeline(db_path: str, cache_dir: str):
                     Platform.SYSTEM,
                     Status.INFO,
                     f"  - Changes processed: {kv['changes_processed']}",
-                )
-                pprint.print(
-                    Platform.SYSTEM,
-                    Status.INFO,
-                    f"  - Connection type: {kv['connection_type']}",
-                )
-                pprint.print(
-                    Platform.SYSTEM,
-                    Status.INFO,
-                    f"  - Total KV keys: {kv['total_keys']}",
                 )
 
                 return True
@@ -356,16 +325,6 @@ def run_ingest_phase(db_path: str, force_overwrite_all: bool = False):
                     Platform.SYSTEM,
                     Status.INFO,
                     f"Changes processed: {result['changes_processed']}",
-                )
-                pprint.print(
-                    Platform.SYSTEM,
-                    Status.INFO,
-                    f"Connection type: {result['connection_type']}",
-                )
-                pprint.print(
-                    Platform.SYSTEM,
-                    Status.INFO,
-                    f"Total KV keys: {result['total_keys']}",
                 )
                 return True
             else:

@@ -62,47 +62,13 @@ CACHE_DIR = os.getenv("CACHE_DIR", "cache")
 SCRAPER_CACHE_EXPIRY_DAYS = int(os.getenv("SCRAPER_CACHE_EXPIRY_DAYS", "14"))
 """Number of days to cache scraper data before re-running"""
 
-# Redis configuration - Upstash
-KV_REST_API_URL = os.getenv("KV_REST_API_URL")
-"""Upstash Redis REST API URL"""
-KV_REST_API_TOKEN = os.getenv("KV_REST_API_TOKEN")
-"""Upstash Redis REST API token"""
-
-# Redis configuration - Standard Redis
-REDIS_URL = os.getenv("REDIS_URL")
-"""Redis connection URL"""
-
-# Redis connection components (alternative to URL)
-REDIS_HOST = os.getenv("REDIS_HOST")
-"""Redis host"""
-REDIS_PORT = int(os.getenv("REDIS_PORT", "6379")) if os.getenv("REDIS_PORT") else 6379
-"""Redis port"""
-REDIS_USER = os.getenv("REDIS_USER")
-"""Redis username"""
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
-"""Redis password"""
-REDIS_DB = int(os.getenv("REDIS_DB", "0"))
-"""Redis database number (only used with component architecture)"""
-REDIS_SSL = os.getenv("REDIS_SSL", "").lower() in ["true", "1", "yes"]
-"""Redis SSL/TLS enabled"""
-REDIS_SSL_CERT_PATH = os.getenv("REDIS_SSL_CERT_PATH")
-"""Path to Redis SSL certificate"""
-REDIS_SSL_KEY_PATH = os.getenv("REDIS_SSL_KEY_PATH")
-"""Path to Redis SSL key"""
-REDIS_SSL_CA_PATH = os.getenv("REDIS_SSL_CA_PATH")
-"""Path to Redis SSL CA certificate"""
-
-# Build Redis URL from components if URL not provided
-if not REDIS_URL and REDIS_HOST:
-    # Build URL from components
-    auth_part = ""
-    if REDIS_USER and REDIS_PASSWORD:
-        auth_part = f"{REDIS_USER}:{REDIS_PASSWORD}@"
-    elif REDIS_PASSWORD:
-        auth_part = f":{REDIS_PASSWORD}@"
-
-    protocol = "rediss" if REDIS_SSL else "redis"
-    REDIS_URL = f"{protocol}://{auth_part}{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+# Cloudflare Workers KV configuration
+CLOUDFLARE_ACCOUNT_ID = os.getenv("CLOUDFLARE_ACCOUNT_ID")
+"""Cloudflare account ID"""
+CLOUDFLARE_KV_NAMESPACE_ID = os.getenv("CLOUDFLARE_KV_NAMESPACE_ID")
+"""Cloudflare Workers KV namespace ID"""
+CLOUDFLARE_AUTH_TOKEN = os.getenv("CLOUDFLARE_AUTH_TOKEN")
+"""Cloudflare API token with Workers KV permissions"""
 
 pprint = PrettyPrint()
 """PrettyPrint class instance"""

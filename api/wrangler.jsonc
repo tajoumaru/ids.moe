@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ids-moe-api-ts",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-08-03",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "./assets",
+    "binding": "ASSETS"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "IDS_KV",
+      "id": "aa22665871054e7bb136507c62e93b00"
+    }
+  ],
+  "vars": {
+    "ENVIRONMENT": "production"
+  },
+  "routes": [
+    {
+      "pattern": "ids.moe/*",
+      "zone_name": "ids.moe"
+    }
+  ]
+}

@@ -6,32 +6,32 @@ This project is forked from [nattadasu/animeApi](https://github.com/nattadasu/an
 
 ## 🚀 Key Improvements
 
-- **Over 100x Faster API Response**: Go-based API with Redis KV store
+- **Over 100x Faster API Response**: TypeScript-based API with Cloudflare Workers KV
   - Average response time of **~0.003s** (down from ~0.400s on `animeapi.my.id`)
 - **Much Faster Data Processing**: PostgreSQL with `COPY FROM` insertions and multiprocessing
 - **Intelligent Caching**: Only downloads & processes changed data with hash-based detection
-- **Space Efficient**: Two-tier Redis structure (300k ID mappings → internal IDs → full objects)
-- **Serverless Ready & Free**: Meant to deploy with Vercel, Neon & Upstash Free Tiers out of the box
+- **Space Efficient**: Two-tier KV structure (300k ID mappings → internal IDs → full objects)
+- **Serverless Ready & Free**: Meant to deploy with Cloudflare Workers & Neon Free Tiers out of the box
 - **Modern Pipeline**: GitHub Actions with dependency caching and incremental updates
 
 ## 🏗️ Architecture
 
-### API Layer (Go)
-- **Runtime**: Go with Redis client
-- **Hosting**: Vercel Functions
+### API Layer (TypeScript)
+- **Runtime**: TypeScript with Wrangler/Cloudflare Workers
+- **Hosting**: Cloudflare Workers (Edge Computing)
 - **Response Time**: ~0.003s typical response
-  - Dependent on region
-  - The public instance `ids.moe` has local cdn in US West, US East and Frankfurt
+  - Globally distributed with edge locations worldwide
+  - Automatic regional routing for optimal latency
 
 ### Data Pipeline (Python)
-- **Database**: PostgreSQL (remote or local)
-- **Cache**: Redis/Upstash KV (remote or local)
+- **Database**: PostgreSQL on Neon (remote or local)
+- **Cache**: Cloudflare Workers KV (edge-replicated key-value store)
 - **Processing**: Many operations multithreaded and optimized
-- **Scheduling**: GitHub Actions (nightly updates to the db and kvstore)
+- **Scheduling**: GitHub Actions (nightly updates to the db and KV store)
 
 ### Storage Strategy
-1. **Platform ID → Internal ID**: ~300k Redis keys (e.g., `anilist_156` → `466`)
-2. **Internal ID → Full Data**: Single Redis key per anime with all platform IDs
+1. **Platform ID → Internal ID**: ~300k KV entries (e.g., `anilist_156` → `466`)
+2. **Internal ID → Full Data**: Single KV entry per anime with all platform IDs
    - Two tiered approach is both fast and space efficient with no duplicate data
 3. **Change Detection**: SHA-256 hashes stored in PostgreSQL for incremental updates
 
@@ -135,45 +135,53 @@ All platforms support multiple aliases (case-insensitive):
 ## 🚀 Deploy Your Own Instance
 
 ### 1. Fork the Repository
-1. Just press the "Fork" button in the top right
-2. GitHub will guide you through the rest
+1. Click the "Fork" button in the top right to create your own copy. (You'll need this to run GitHub Actions with your own database.)
 
-### 2. Set up Vercel
-1. Go to [Vercel](https://vercel.com)
-2. Create an account and connect your github account
-3. Import your personal fork
-4. Deploy it (the api will not work yet)
 
-### 3. Add Database & Redis
-In Vercel Storage tab:\
-*Make sure to use US Washington as primary region for both*\
-*The primary region will not affect api response times, only insertion time for github actions*
-- Add **Neon PostgreSQL** database
-- Add **Upstash Redis** instance (select your location as the read region, *not as the primary region*)
+### 2. Set up PostgreSQL Database
+1. Go to [Neon](https://neon.tech) and create a free account
+2. Create a new project (choose region closest to you)
+3. Save the connection string for later
 
-Both work perfectly on free tiers for this use case.
+### 3. Deploy API to Cloudflare Workers
 
-- **Afterwards redeploy the Vercel deployment**
+[![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/tajoumaru/ids.moe)
 
-### 4. Configure Secrets
-Add these GitHub repository secrets:
+Click the button above to:
+- Set up Cloudflare Workers for the API
+- Create KV namespace for caching
+- Deploy the TypeScript API
+
+After deployment, note your:
+- KV namespace ID 
+- Cloudflare Account ID [How to find it](https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/#find-account-id-workers-and-pages)
+- Cloudflare Auth Token [How to create one]()
+
+### 4. Configure GitHub Secrets
+In your forked repository, go to Settings → Secrets → Actions and add:
 
 **Required**:
 - `DATABASE_URL` - PostgreSQL connection string from Neon
-- `KV_REST_API_URL` - Upstash Redis URL
-- `KV_REST_API_TOKEN` - Upstash Redis token
-> ^ All three can be found on vercel in the storage settings
+- `CLOUDFLARE_AUTH_TOKEN` - Create at Cloudflare Dashboard → My Profile → API Tokens (needs Workers KV edit permissions)
+- `CLOUDFLARE_ACCOUNT_ID` - From Cloudflare Workers dashboard
+- `CLOUDFLARE_KV_NAMESPACE_ID` - From Workers KV dashboard (created during deployment)
 
 **Optional but recommended**:
 - `KAIZE_EMAIL` - Kaize account email (kaize scraper is skipped otherwise)
 - `KAIZE_PASSWORD` - Kaize account password (kaize scraper is skipped otherwise)
-- `GITHUB_TOKEN` - GitHub Personal Access Token (should not be needed normally)
 
-### 5. Enable Actions
-Enable GitHub Actions in your fork. The first run takes ~1 hour to populate all data. Subsequent runs are much faster (2-10 minutes).
+### 5. Enable GitHub Actions
+1. Go to the Actions tab in your forked repository
+2. Enable workflows
+3. Manually trigger the "Update Database" workflow for initial data population
 
-### 6. Manual Trigger (if needed)
-If Actions don't start automatically, manually trigger the workflow.
+The first run takes ~1 hour to populate all data. Subsequent runs are much faster (2-10 minutes) and run automatically every night.
+
+### 6. Verify Deployment
+Once the GitHub Action completes, test your API:
+```bash
+curl https://your-worker.workers.dev/mal/1
+```
 
 ## 🛠️ Local Development
 

@@ -357,8 +357,6 @@ class SQLAlchemyPipeline:
                         "success": True,
                         "time": time.time() - start_time,
                         "changes_processed": 0,
-                        "connection_type": "none",
-                        "total_keys": 0,
                     }
 
                 # Process changes
@@ -370,8 +368,6 @@ class SQLAlchemyPipeline:
 
                 changes_processed = len(pending_changes)
 
-            # Get KV stats
-            kv_stats = kv_ingest.get_kv_stats()
 
             kv_time = time.time() - start_time
 
@@ -379,8 +375,6 @@ class SQLAlchemyPipeline:
                 "success": True,
                 "time": kv_time,
                 "changes_processed": changes_processed,
-                "connection_type": kv_stats["connection_type"],
-                "total_keys": kv_stats["total_keys"],
             }
 
             pprint.print(

@@ -2,86 +2,64 @@
 # Copyright 2025 tajoumaru
 
 """
-Incremental KV Store ingestion module - supports both regular Redis and Upstash Redis
+Incremental KV Store ingestion module - uses Cloudflare Workers KV
 """
 
-import os
 import json
-from typing import Any, Dict, List, Union
+from typing import Dict, List, Union
 from dataclasses import asdict
 
-from generator.const import pprint
+from generator.const import (
+    pprint,
+    CLOUDFLARE_ACCOUNT_ID,
+    CLOUDFLARE_KV_NAMESPACE_ID,
+    CLOUDFLARE_AUTH_TOKEN,
+)
 from generator.prettyprint import Platform, Status
 from generator.models import ChangeLog
 from generator.anime_record import AnimeRecord
 
 
 class IncrementalKVIngest:
-    """Handles incremental ingestion of anime data into dual KV store structure"""
+    """Handles incremental ingestion of anime data into Cloudflare Workers KV"""
 
     def __init__(self) -> None:
-        """Initialize Redis connection - supports both regular Redis and Upstash"""
-        self.client = None
-        self.is_upstash = False
-
-        # Check for Upstash credentials first
-        upstash_url = os.getenv("KV_REST_API_URL")
-        upstash_token = os.getenv("KV_REST_API_TOKEN")
-
-        if upstash_url and upstash_token:
-            # Use Upstash Redis client
-            try:
-                from upstash_redis import Redis as UpstashRedis
-
-                self.client = UpstashRedis(url=upstash_url, token=upstash_token)
-                self.is_upstash = True
-                pprint.print(
-                    Platform.SYSTEM, Status.INFO, "Using Upstash Redis connection"
-                )
-            except ImportError:
-                pprint.print(
-                    Platform.SYSTEM, Status.ERR, "upstash-redis package not installed"
-                )
-                raise
-        else:
-            # Fall back to regular Redis
-            redis_url = os.getenv("REDIS_URL")
-            redis_db = int(os.getenv("REDIS_DB", "0"))
-
-            if not redis_url:
-                pprint.print(
-                    Platform.SYSTEM,
-                    Status.ERR,
-                    "Either KV_REST_API_URL/KV_REST_API_TOKEN or REDIS_URL must be set",
-                )
-                raise ValueError("Missing Redis credentials")
-
-            try:
-                import redis
-
-                self.client = redis.from_url(redis_url, db=redis_db)
-                self.is_upstash = False
-                pprint.print(
-                    Platform.SYSTEM,
-                    Status.INFO,
-                    f"Using regular Redis connection (DB {redis_db})",
-                )
-            except ImportError:
-                pprint.print(Platform.SYSTEM, Status.ERR, "redis package not installed")
-                raise
+        """Initialize Cloudflare Workers KV connection"""
+        # Get Cloudflare KV credentials from const.py
+        if not (CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_KV_NAMESPACE_ID and CLOUDFLARE_AUTH_TOKEN):
+            pprint.print(
+                Platform.SYSTEM,
+                Status.ERR,
+                "CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_KV_NAMESPACE_ID, and CLOUDFLARE_AUTH_TOKEN must be set",
+            )
+            raise ValueError("Missing Cloudflare KV credentials")
+        
+        # Initialize Cloudflare Workers KV client
+        try:
+            from generator.cloudflare_kv import CloudflareKV
+            
+            self.client = CloudflareKV(
+                account_id=CLOUDFLARE_ACCOUNT_ID,
+                namespace_id=CLOUDFLARE_KV_NAMESPACE_ID,
+                auth_token=CLOUDFLARE_AUTH_TOKEN
+            )
+            pprint.print(
+                Platform.SYSTEM, Status.INFO, "Using Cloudflare Workers KV connection"
+            )
+        except ImportError:
+            pprint.print(
+                Platform.SYSTEM, Status.ERR, "cloudflare_kv module not found"
+            )
+            raise
 
         # Test connection
         try:
-            if self.is_upstash:
-                # Upstash doesn't have ping, so test with a simple get
-                self.client.get("test_connection")
-            else:
-                # Regular Redis has ping
-                self.client.ping()
-            pprint.print(Platform.SYSTEM, Status.PASS, "Connected to KV store")
+            # Cloudflare KV doesn't have ping, so test with a simple get
+            self.client.get("test_connection")
+            pprint.print(Platform.SYSTEM, Status.PASS, "Connected to Cloudflare Workers KV")
         except Exception as e:
             pprint.print(
-                Platform.SYSTEM, Status.ERR, f"Failed to connect to KV store: {e}"
+                Platform.SYSTEM, Status.ERR, f"Failed to connect to Cloudflare Workers KV: {e}"
             )
             raise
 
@@ -178,8 +156,8 @@ class IncrementalKVIngest:
 
         batch_data: Dict[str, Union[str, None]] = {}
 
-        # Much larger batch sizes for KV operations
-        batch_size = 10000 if self.is_upstash else 5000
+        # Cloudflare KV supports up to 10000 operations per batch
+        batch_size = 10000
 
         # Process deletes (simple - just mark anime IDs as deleted)
         for change in deletes:
@@ -310,29 +288,19 @@ class IncrementalKVIngest:
             return {}
 
     def _execute_batch(self, batch_data: Dict[str, Union[str, None]]) -> None:
-        """Execute a batch of KV operations"""
+        """Execute a batch of Cloudflare KV operations"""
         if not batch_data:
             return
 
         try:
-            if self.is_upstash:
-                # Upstash Redis - separate deletes and sets
-                deletes = [k for k, v in batch_data.items() if v is None]
-                sets = {k: v for k, v in batch_data.items() if v is not None}
+            # Cloudflare KV - separate deletes and sets
+            deletes = [k for k, v in batch_data.items() if v is None]
+            sets = {k: v for k, v in batch_data.items() if v is not None}
 
-                if deletes:
-                    self.client.delete(*deletes)
-                if sets:
-                    self.client.mset(sets)
-            else:
-                # Regular Redis - use pipeline for better performance
-                pipeline = self.client.pipeline()
-                for key, value in batch_data.items():
-                    if value is None:
-                        pipeline.delete(key)
-                    else:
-                        pipeline.set(key, value)
-                pipeline.execute()
+            if deletes:
+                self.client.delete(*deletes)
+            if sets:
+                self.client.mset(sets)
 
         except Exception as e:
             pprint.print(Platform.SYSTEM, Status.ERR, f"Failed to execute batch: {e}")
@@ -346,36 +314,14 @@ class IncrementalKVIngest:
                 except Exception:
                     pass
 
-    def get_kv_stats(self) -> Dict[str, Any]:
-        """Get KV store statistics"""
-        try:
-            if self.is_upstash:
-                total_keys = self.client.dbsize()
-            else:
-                info = self.client.info()
-                total_keys = info.get("db0", {}).get("keys", 0)
-
-            return {
-                "total_keys": total_keys,
-                "connection_type": "upstash" if self.is_upstash else "redis",
-            }
-        except Exception as e:
-            pprint.print(Platform.SYSTEM, Status.ERR, f"Error getting KV stats: {e}")
-            return {"total_keys": 0, "connection_type": "unknown"}
 
     def prune_all_keys(self) -> None:
-        """Delete all keys from the KV store."""
+        """Delete all keys from Cloudflare Workers KV."""
         try:
-            if self.is_upstash:
-                # Upstash Redis
-                self.client.flushdb()
-            else:
-                # Regular Redis
-                self.client.flushdb()
-
-            pprint.print(Platform.SYSTEM, Status.INFO, "All KV store keys deleted")
+            self.client.flushdb()
+            pprint.print(Platform.SYSTEM, Status.INFO, "All Cloudflare KV keys deleted")
         except Exception as e:
-            pprint.print(Platform.SYSTEM, Status.ERR, f"Error pruning KV store: {e}")
+            pprint.print(Platform.SYSTEM, Status.ERR, f"Error pruning Cloudflare KV: {e}")
             raise
 
 

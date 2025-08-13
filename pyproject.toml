@@ -12,11 +12,9 @@ dependencies = [
     "psycopg2-binary>=2.9.10",
     "python-levenshtein>=0.27.1",
     "python-slugify>=8.0.4",
-    "redis>=6.2.0",
     "requests[socks]>=2.32.4",
     "sqlalchemy>=2.0.41",
     "thefuzz>=0.22.1",
-    "upstash-redis>=1.4.0",
     "zstandard>=0.23.0",
 ]
 
