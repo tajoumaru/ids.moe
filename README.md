@@ -231,8 +231,6 @@ uvx ruff check --fix         # Linting
 uvx ruff format             # Formatting
 ```
 
-### More usage examples and other commands in [USAGE.md](USAGE.md)
-
 ### TypeScript API Development
 ```bash
 cd api-ts
