@@ -134,51 +134,54 @@ All platforms support multiple aliases (case-insensitive):
 
 ## 🚀 Deploy Your Own Instance
 
-### 1. Fork the Repository
-1. Click the "Fork" button in the top right to create your own copy. (You'll need this to run GitHub Actions with your own database.)
-
-
-### 2. Set up PostgreSQL Database
-1. Go to [Neon](https://neon.tech) and create a free account
-2. Create a new project (choose region closest to you)
-3. Save the connection string for later
-
-### 3. Deploy API to Cloudflare Workers
+### 1. Deploy to Cloudflare Workers
 
 [![Deploy to Cloudflare Workers](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/tajoumaru/ids.moe)
 
 Click the button above to:
+- Clone the repo
 - Set up Cloudflare Workers for the API
 - Create KV namespace for caching
 - Deploy the TypeScript API
 
-After deployment, note your:
-- KV namespace ID 
-- Cloudflare Account ID [How to find it](https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/#find-account-id-workers-and-pages)
-- Cloudflare Auth Token [How to create one]()
+**Make sure to choose a github account for the repo location. Gitlab did not work in my testing.**
 
-### 4. Configure GitHub Secrets
-In your forked repository, go to Settings → Secrets → Actions and add:
+After deployment, note these down:
+- KV namespace ID [Find it here](https://dash.cloudflare.com/?to=/:account/workers/kv/namespaces)
+- Cloudflare Account ID [Here in the right sidebar](https://dash.cloudflare.com/?to=/:account/workers-and-pages)
+- Cloudflare Auth Token [Create one here with template "Edit Cloudflare Workers"](https://dash.cloudflare.com/profile/api-tokens)
+
+### 2. Set up PostgreSQL Database
+1. Go to [Neon](https://neon.tech) and create a free account
+2. Create a new project
+3. Save the connection string for later
+
+### 3. Configure GitHub Secrets
+1. Go to the repo that cloudflare created on your personal github account.
+2. Go to Settings -> Secrets and variables -> Actions
+3. Add these as repository secrets:
 
 **Required**:
-- `DATABASE_URL` - PostgreSQL connection string from Neon
-- `CLOUDFLARE_AUTH_TOKEN` - Create at Cloudflare Dashboard → My Profile → API Tokens (needs Workers KV edit permissions)
-- `CLOUDFLARE_ACCOUNT_ID` - From Cloudflare Workers dashboard
-- `CLOUDFLARE_KV_NAMESPACE_ID` - From Workers KV dashboard (created during deployment)
+- `DATABASE_URL` (Neon)
+- `CLOUDFLARE_AUTH_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_KV_NAMESPACE_ID`
 
 **Optional but recommended**:
-- `KAIZE_EMAIL` - Kaize account email (kaize scraper is skipped otherwise)
-- `KAIZE_PASSWORD` - Kaize account password (kaize scraper is skipped otherwise)
+Otherwise kaize id's will be skipped. Simply create an account on Kaize and enter your details here.
+- `KAIZE_EMAIL`
+- `KAIZE_PASSWORD`
 
-### 5. Enable GitHub Actions
+### 4. Enable GitHub Actions
 1. Go to the Actions tab in your forked repository
 2. Enable workflows
-3. Manually trigger the "Update Database" workflow for initial data population
+3. Manually trigger the "Run generator pipeline" workflow for initial data population
 
 The first run takes ~1 hour to populate all data. Subsequent runs are much faster (2-10 minutes) and run automatically every night.
 
 ### 6. Verify Deployment
 Once the GitHub Action completes, test your API:
+(Find the url below in your cloudflare worker settings)
 ```bash
 curl https://your-worker.workers.dev/mal/1
 ```

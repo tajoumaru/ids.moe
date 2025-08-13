@@ -1,5 +1,5 @@
 [project]
-name = "idsmoe"
+name = "ids-moe"
 version = "0.1.0"
 description = "A blazingly fast RESTful API that provides anime relation mapping across multiple anime databases. "
 readme = "README.md"

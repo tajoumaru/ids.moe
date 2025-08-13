@@ -3,9 +3,6 @@
     "name": "ids-moe",
     "main": "api/src/index.ts",
     "compatibility_date": "2025-08-03",
-    "observability": {
-        "enabled": true
-    },
     "assets": {
         "directory": "api/assets",
         "binding": "ASSETS"
@@ -19,6 +16,7 @@
     // --- IDS.MOE SPECIFIC CONFIG ---
     "env": {
         "tajoumaru": {
+            "name": "ids-moe",
             "kv_namespaces": [
                 {
                     "binding": "IDS_KV",
