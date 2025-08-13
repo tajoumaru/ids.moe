@@ -1,13 +1,13 @@
 {
-  "$schema": "api/node_modules/wrangler/config-schema.json",
+  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "ids-moe-api-ts",
-  "main": "api/src/index.ts",
+  "main": "src/index.ts",
   "compatibility_date": "2025-08-03",
   "observability": {
     "enabled": true
   },
   "assets": {
-    "directory": "api/assets",
+    "directory": "assets",
     "binding": "ASSETS"
   },
   "kv_namespaces": [
