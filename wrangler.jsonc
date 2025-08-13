@@ -30,7 +30,7 @@
                     "pattern": "ids.moe/*",
                     "zone_name": "ids.moe"
                 }
-            ]
+            ],"name": "ids-moe"
         }
     },
 }
