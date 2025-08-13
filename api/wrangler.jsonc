@@ -1,6 +1,5 @@
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	// --- BASE CONFIGURATION (for the Deploy Button) ---
 	"name": "ids-moe",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-08-03",
@@ -14,24 +13,13 @@
 	"kv_namespaces": [
 		{
 			"binding": "IDS_KV",
-			"id": "example"
+			"id": "aa22665871054e7bb136507c62e93b00"
 		}
 	],
-	// --- IDS.MOE SPECIFIC PRODUCTION ENVIRONMENT (IGNORE) ---
-	"env": {
-		"tajoumaru": {
-			"kv_namespaces": [
-				{
-					"binding": "IDS_KV",
-					"id": "aa22665871054e7bb136507c62e93b00"
-				}
-			],
-			"routes": [
-				{
-					"pattern": "ids.moe/*",
-					"zone_name": "ids.moe"
-				}
-			]
+	"routes": [
+		{
+			"pattern": "ids.moe/*",
+			"zone_name": "ids.moe"
 		}
-	}
+	]
 }
