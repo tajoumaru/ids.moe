@@ -10,6 +10,7 @@ import { createCorsResponse, createRedirectResponse, createTextResponse, createE
 import { handlePlatformRoute, handleTraktRoute, handleTMDBRoute } from './handlers/platform';
 import { handleStatus, handleHeartbeat, handleSchema, handleUpdated } from './handlers/status';
 import { handleRedirect } from './handlers/redirect';
+import { trackEvent } from './analytics';
 
 export async function handleRequest(context: RouteContext): Promise<Response> {
   const { request } = context;
@@ -28,66 +29,86 @@ export async function handleRequest(context: RouteContext): Promise<Response> {
   }
 
   const startTime = Date.now();
+  let response: Response;
 
   try {
     // Route matching
     switch (true) {
       case path === '/':
-        return createRedirectResponse('https://github.com/tajoumaru/ids.moe');
+        response = createRedirectResponse('https://github.com/tajoumaru/ids.moe');
+        break;
 
       case path === '/status':
         // Try to fetch from static assets first
         const statusAsset = await context.env.ASSETS.fetch(new Request(new URL('/status.json', request.url)));
         if (statusAsset.ok) {
-          return statusAsset;
+          response = statusAsset;
+        } else {
+          response = await handleStatus();
         }
-        return await handleStatus();
+        break;
 
       case path === '/heartbeat' || path === '/ping':
-        return await handleHeartbeat(context, startTime);
+        response = await handleHeartbeat(context, startTime);
+        break;
 
       case path === '/schema' || path === '/schema.json':
         // Try to fetch from static assets first
         const schemaAsset = await context.env.ASSETS.fetch(new Request(new URL('/schema.json', request.url)));
         if (schemaAsset.ok) {
-          return schemaAsset;
+          response = schemaAsset;
+        } else {
+          response = await handleSchema();
         }
-        return await handleSchema();
+        break;
 
       case path === '/updated':
-        return await handleUpdated(context);
+        response = await handleUpdated(context);
+        break;
 
       case path === '/robots.txt':
         // Try to fetch from static assets first
         const robotsAsset = await context.env.ASSETS.fetch(request);
         if (robotsAsset.ok) {
-          return robotsAsset;
+          response = robotsAsset;
+        } else {
+          response = createTextResponse('User-agent: *\nDisallow:');
         }
-        return createTextResponse('User-agent: *\nDisallow:');
+        break;
 
       case path === '/favicon.ico':
         // Fetch from static assets
-        return await context.env.ASSETS.fetch(request);
+        response = await context.env.ASSETS.fetch(request);
+        break;
 
       case path.startsWith('/trakt/'):
-        return await handleTraktRoute(context, path);
+        response = await handleTraktRoute(context, path);
+        break;
 
       case path.startsWith('/themoviedb/'):
-        return await handleTMDBRoute(context, path);
+        response = await handleTMDBRoute(context, path);
+        break;
 
       case path === '/rd' || path === '/redirect':
-        return await handleRedirect(context);
+        response = await handleRedirect(context);
+        break;
 
       default:
         // Handle platform routes
-        return await handlePlatformRoute(context, path);
+        response = await handlePlatformRoute(context, path);
+        break;
     }
   } catch (error) {
     console.error('Router error:', error);
-    return createErrorResponse(
+    response = createErrorResponse(
       'Internal server error',
       500,
       'An unexpected error occurred'
     );
   }
+
+  // Track analytics
+  context.ctx.waitUntil(trackEvent(context.env, request, response, startTime));
+
+  return response;
 }

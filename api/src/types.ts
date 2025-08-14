@@ -8,6 +8,7 @@
 export interface Env {
   IDS_KV: KVNamespace;
   ASSETS: Fetcher;
+  ANALYTICS: AnalyticsEngineDataset;
 }
 
 export interface ErrorResponse {
