@@ -13,6 +13,12 @@
             "id": "will_be_overwritten"
         }
     ],
+     "analytics_engine_datasets": [
+        {
+            "binding": "ANALYTICS",
+            "dataset": "ids-moe-analytics"
+        }
+     ],
     // --- IDS.MOE SPECIFIC CONFIG ---
     "env": {
         "tajoumaru": {
