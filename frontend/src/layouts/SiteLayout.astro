@@ -1,0 +1,95 @@
+---
+import {
+    SignedIn,
+    SignedOut,
+    UserButton,
+    SignInButton,
+} from "@clerk/astro/components";
+import ThemeIcon from "../components/ThemeIcon.astro";
+
+import "../styles/global.css";
+
+export interface Props {
+    title?: string;
+}
+
+const { title = "ids.moe - Anime ID Mapping API" } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en" class="h-full">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <meta name="generator" content={Astro.generator} />
+        <meta
+            name="description"
+            content="High-performance anime ID mapping API - Cross-platform anime database relations"
+        />
+        <title>{title}</title>
+    </head>
+    <body class="h-full bg-gray-50 dark:bg-gray-900 dark:text-gray-100">
+        <div class="min-h-full">
+            <nav
+                class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700"
+            >
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex justify-between h-16">
+                        <div class="flex items-center">
+                            <a href="/" class="flex items-center">
+                                <span
+                                    class="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent"
+                                >
+                                    ids.moe
+                                </span>
+                            </a>
+                            <div class="hidden sm:ml-8 sm:flex sm:space-x-8">
+                                <a
+                                    href="/"
+                                    class="text-gray-900 dark:text-gray-100 inline-flex items-center px-1 pt-1 text-sm font-medium"
+                                >
+                                    Home
+                                </a>
+                                <a
+                                    href="https://github.com/tajoumaru/ids.moe"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    class="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 inline-flex items-center px-1 pt-1 text-sm font-medium"
+                                >
+                                    Source Code
+                                </a>
+                                <SignedIn>
+                                    <a
+                                        href="/dashboard"
+                                        class="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 inline-flex items-center px-1 pt-1 text-sm font-medium"
+                                    >
+                                        Dashboard
+                                    </a>
+                                </SignedIn>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <SignedOut>
+                                <SignInButton mode="modal" asChild={true}>
+                                    <button
+                                        class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer"
+                                    >
+                                        Sign In
+                                    </button>
+                                </SignInButton>
+                            </SignedOut>
+                            <SignedIn>
+                                <UserButton />
+                            </SignedIn>
+                            <ThemeIcon />
+                        </div>
+                    </div>
+                </div>
+            </nav>
+            <main>
+                <slot />
+            </main>
+        </div>
+    </body>
+</html>

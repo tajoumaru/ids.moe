@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Copyright 2025 tajoumaru
 
-import { Env } from './types';
+import { Env, RouteContext } from './types';
 
 export interface AnalyticsEvent {
   indexes?: string[];
@@ -13,7 +13,8 @@ export async function trackEvent(
   env: Env,
   request: Request,
   response: Response,
-  startTime: number
+  startTime: number,
+  user?: RouteContext['user']
 ): Promise<void> {
   if (!env.ANALYTICS) {
     return;
@@ -54,22 +55,30 @@ export async function trackEvent(
   // Get country from CF headers if available
   const country = request.headers.get('cf-ipcountry') || 'unknown';
 
+  // Authentication info
+  const isAuthenticated = user ? 1 : 0;
+  const userTier = user?.tier || 'anonymous';
+  const userId = user?.userId || 'anonymous';
+
   try {
     env.ANALYTICS.writeDataPoint({
       indexes: [
-        endpoint,                    // index1: endpoint type
-        String(response.status),      // index2: status code
-        platform,                     // index3: platform (for platform lookups)
-        isBot ? 'bot' : 'user',      // index4: bot or user
-        country,                      // index5: country
+        endpoint,                    // index: endpoint type (only 1 index supported despite it being an array)
       ],
-      doubles: [
+      doubles: [                      // Numerical only data
         duration,                     // double1: response time in ms
         1,                           // double2: request count (for aggregation)
+        response.status,             // double3: status code
+        isBot ? 1 : 0,              // double4: bot flag (1=bot, 0=user)
+        isAuthenticated,             // double5: authenticated flag (1=auth, 0=anon)
       ],
-      blobs: [
+      blobs: [                       // String Values for filtering/grouping data
         path,                        // blob1: full path
         userAgent.substring(0, 100), // blob2: user agent (truncated)
+        platform,                    // blob3: platform (for platform lookups)
+        country,                     // blob4: country code
+        userTier,                    // blob5: user tier (anonymous/free/pro/enterprise)
+        userId.substring(0, 50),     // blob6: user ID (truncated for privacy)
       ],
     });
   } catch (error) {

@@ -1,0 +1,42 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "ids-moe-api",
+    "main": "src/index.ts",
+    "compatibility_date": "2025-08-13",
+    "assets": {
+        "directory": "assets",
+        "binding": "ASSETS"
+    },
+    "observability": {
+        "enabled": true
+    },
+    "kv_namespaces": [
+        {
+            "binding": "IDS_KV",
+            "id": "aa22665871054e7bb136507c62e93b00"
+        },
+        {
+            "binding": "AUTH_CACHE",
+            "id": "128cc8b2374840e29f395655ac4c55d6"
+        },
+        {
+            "binding": "RATE_LIMIT",
+            "id": "0d6b182e97e74ae4bf42293edfcaeb04"
+        }
+    ],
+    "routes": [
+        {
+            "pattern": "api.ids.moe/*",
+            "zone_name": "ids.moe"
+        }
+    ],
+    "analytics_engine_datasets": [
+        {
+            "binding": "ANALYTICS",
+            "dataset": "ids-moe-analytics"
+        }
+    ],
+    "vars": {
+        "REQUIRE_AUTH": "true"
+    }
+}

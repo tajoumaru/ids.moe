@@ -1,0 +1,32 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "ids-moe",
+    "main": "./dist/_worker.js/index.js",
+    "compatibility_date": "2025-08-13",
+    "compatibility_flags": [
+        "nodejs_compat",
+        "global_fetch_strictly_public"
+    ],
+    "assets": {
+        "binding": "ASSETS",
+        "directory": "./dist"
+    },
+    "observability": {
+        "enabled": true
+    },
+    "analytics_engine_datasets": [
+        {
+            "binding": "ANALYTICS",
+            "dataset": "ids-moe-analytics"
+        }
+    ],
+    "routes": [
+        {
+            "pattern": "ids.moe/*",
+            "zone_name": "ids.moe"
+        }
+    ],
+    "vars": {
+        "PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuaWRzLm1vZSQ"
+    }
+}

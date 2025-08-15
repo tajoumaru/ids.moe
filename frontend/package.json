@@ -1,0 +1,25 @@
+{
+	"name": "ids-moe",
+	"type": "module",
+	"version": "0.0.1",
+	"scripts": {
+		"dev": "astro dev",
+		"build": "astro build",
+		"preview": "astro build && wrangler dev",
+		"astro": "astro",
+		"deploy": "astro build && wrangler deploy",
+		"cf-typegen": "wrangler types"
+	},
+	"dependencies": {
+		"@astrojs/cloudflare": "^12.6.3",
+		"@clerk/astro": "^2.11.2",
+		"@clerk/themes": "^2.4.9",
+		"@tailwindcss/vite": "^4.1.12",
+		"astro": "^5.13.0",
+		"tailwindcss": "^4.1.12"
+	},
+	"devDependencies": {
+		"@types/node": "^24.2.1",
+		"wrangler": "^4.30.0"
+	}
+}

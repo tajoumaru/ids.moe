@@ -1,0 +1,41 @@
+---
+import SiteLayout from "../layouts/SiteLayout.astro";
+
+import { SignIn } from "@clerk/astro/components";
+---
+
+<SiteLayout title="Sign In - ids.moe">
+    <div
+        class="min-h-[calc(100vh-4rem)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8"
+    >
+        <div class="max-w-md w-full space-y-8">
+            <div class="text-center">
+                <h2 class="text-3xl font-extrabold text-gray-900 dark:text-gray-100">
+                    Welcome to ids.moe
+                </h2>
+                <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                    Sign in or create an account to get your API key
+                </p>
+            </div>
+
+            <div id="auth-container" class="mt-8">
+                <SignIn
+                    routing="path"
+                    path="/login"
+                    signUpUrl="/register"
+                    fallbackRedirectUrl="/dashboard"
+                    appearance={{
+                        elements: {
+                            rootBox: "mx-auto",
+                            card: "shadow-xl",
+                            formButtonPrimary:
+                                "bg-purple-600 hover:bg-purple-700",
+                            footerActionLink:
+                                "text-purple-600 hover:text-purple-700",
+                        },
+                    }}
+                />
+            </div>
+        </div>
+    </div>
+</SiteLayout>

@@ -9,6 +9,12 @@ export interface Env {
   IDS_KV: KVNamespace;
   ASSETS: Fetcher;
   ANALYTICS: AnalyticsEngineDataset;
+  AUTH_CACHE: KVNamespace;
+  RATE_LIMIT: KVNamespace;
+  CLERK_SECRET_KEY?: string;
+  CLERK_ISSUER?: string;
+  CLERK_AUTHORIZED_PARTIES?: string;
+  REQUIRE_AUTH?: string; // "true" to enable authentication
 }
 
 export interface ErrorResponse {
@@ -57,12 +63,26 @@ export interface AnimeData {
 
 export type Platform = keyof Omit<AnimeData, 'title' | 'themoviedb_season' | 'themoviedb_type' | 'trakt_season' | 'trakt_type'>;
 
+export interface AuthUser {
+  userId: string;
+  email?: string;
+  tier?: 'free' | 'pro' | 'enterprise';
+  rateLimit?: number;
+}
+
 export interface RouteContext {
   request: Request;
   env: Env;
   ctx: ExecutionContext;
+  user?: AuthUser; // Authenticated user info
 }
 
 export interface QueryParams {
   [key: string]: string | undefined;
+}
+
+export interface RateLimitInfo {
+  remaining: number;
+  reset: number;
+  limit: number;
 }

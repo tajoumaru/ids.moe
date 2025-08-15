@@ -1,0 +1,501 @@
+---
+import { ApiClient } from '../lib/apiClient';
+
+// Get auth data from Astro locals
+const { userId, getToken } = Astro.locals.auth();
+
+// Redirect if not authenticated
+if (!userId) {
+    return Astro.redirect("/login");
+}
+
+// Get current user data
+const user = await Astro.locals.currentUser();
+
+// Get Clerk session token for API authentication
+const sessionToken = await getToken();
+
+// Determine API URL based on environment (check if running locally)
+const isLocal = Astro.url.hostname === 'localhost' || Astro.url.hostname === '127.0.0.1';
+const apiUrl = isLocal
+    ? 'http://localhost:8787' 
+    : 'https://api.ids.moe';
+
+// Fetch existing API key if it exists
+let initialApiKey: string | null = null;
+let apiKeyCreatedAt: number | null = null;
+let apiKeyLastUsed: number | null = null;
+let apiKeyError: string | null = null;
+
+if (sessionToken) {
+    try {
+        const apiClient = new ApiClient(apiUrl, async () => sessionToken);
+        const keyData = await apiClient.getApiKey();
+        
+        if (keyData.exists) {
+            // Key exists but is masked, we'll show the masked version
+            initialApiKey = keyData.key;
+            apiKeyCreatedAt = keyData.createdAt;
+            apiKeyLastUsed = keyData.lastUsed || null;
+        } else if (keyData.key) {
+            // New key was generated, show it in full
+            initialApiKey = keyData.key;
+            apiKeyCreatedAt = keyData.createdAt;
+        }
+    } catch (error) {
+        console.error('Failed to fetch API key:', error);
+        apiKeyError = error instanceof Error ? error.message : 'Failed to fetch API key';
+    }
+} else {
+    apiKeyError = 'No session token available';
+}
+
+const userName =
+    user?.firstName || user?.emailAddresses?.[0]?.emailAddress || "User";
+---
+
+<div class="max-w-4xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+    <div
+        class="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden"
+        id="user-dashboard"
+    >
+        <div class="px-6 py-8 border-b border-gray-200 dark:border-gray-700">
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-gray-100">Dashboard</h1>
+            <p class="mt-2 text-gray-600 dark:text-gray-400" id="user-greeting">
+                Welcome back, {userName}!
+            </p>
+        </div>
+
+        <div class="px-6 py-8" id="dashboard-content">
+            {apiKeyError && (
+                <div class="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    <p class="text-sm text-red-600 dark:text-red-400">
+                        Error loading API key: {apiKeyError}
+                    </p>
+                </div>
+            )}
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                    Your API Key
+                </h2>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Use this key to authenticate your requests to the ids.moe
+                    API. Keep it secure and don't share it publicly.
+                </p>
+                {apiKeyCreatedAt && (
+                    <div class="text-xs text-gray-500 dark:text-gray-500 mb-2" id="api-key-metadata">
+                        Created: {new Date(apiKeyCreatedAt).toLocaleString()}
+                        {apiKeyLastUsed && (
+                            <span>
+                                • Last used: {new Date(apiKeyLastUsed).toLocaleString()}
+                            </span>
+                        )}
+                    </div>
+                )}
+
+                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                    {initialApiKey ? (
+                        initialApiKey.includes('...') ? (
+                            <!-- Masked key display -->
+                            <div class="flex items-center justify-between">
+                                <div class="flex-1 mr-4">
+                                    <code class="text-sm font-mono text-gray-600 dark:text-gray-400" id="api-key-display">{initialApiKey}</code>
+                                    <p class="text-xs text-gray-500 mt-1">Key is masked for security. Full key was shown only once when generated.</p>
+                                </div>
+                                <div class="flex space-x-2">
+                                    <button
+                                        id="regenerate-key-btn"
+                                        class="px-3 py-1 text-sm bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors"
+                                    >
+                                        Regenerate
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <!-- Full key display (should trigger modal) -->
+                            <div id="full-key-container" style="display: none;">
+                                <code class="text-sm font-mono text-gray-900 dark:text-gray-100" id="full-api-key">{initialApiKey}</code>
+                            </div>
+                        )
+                    ) : (
+                        <!-- No key yet -->
+                        <div class="text-center py-8">
+                            <p class="text-gray-500 dark:text-gray-400 mb-4">No API key generated yet</p>
+                            <button
+                                id="generate-key-btn"
+                                class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+                            >
+                                Generate API Key
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+            </div>
+
+            <div class="mb-8">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                    Usage Example
+                </h2>
+                <div class="bg-gray-900 rounded-lg p-4 text-white">
+                    <pre
+                        class="text-sm overflow-x-auto"
+                        id="usage-example">{`# Authenticate with your API key
+curl -H "Authorization: Bearer YOUR_API_KEY" \\
+  https://ids.moe/mal/1
+
+# Or use it as a query parameter
+curl https://ids.moe/mal/1?key=YOUR_API_KEY`}</pre>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+                    API Documentation
+                </h2>
+                <div class="grid sm:grid-cols-2 gap-4">
+                    <a
+                        href="https://github.com/tajoumaru/ids.moe#-api-usage"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="block p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                    >
+                        <h3 class="font-semibold text-gray-900 dark:text-gray-100">
+                            API Reference
+                        </h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                            Learn about available endpoints and response formats
+                        </p>
+                    </a>
+                    <a
+                        href="https://github.com/tajoumaru/ids.moe#supported-platforms"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="block p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                    >
+                        <h3 class="font-semibold text-gray-900 dark:text-gray-100">
+                            Supported Platforms
+                        </h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                            View all 21+ supported anime databases
+                        </p>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- API Key Modal -->
+<div id="api-key-modal" class="fixed inset-0 bg-black/73 bg-opacity-50 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 relative">
+        <div class="text-center mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                🔑 Your New API Key
+            </h3>
+            <p class="text-sm text-orange-600 dark:text-orange-400 mb-4">
+                ⚠️ This is the only time you'll see the full key. Copy it now!
+            </p>
+        </div>
+        
+        <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 mb-6">
+            <code class="text-sm font-mono text-gray-900 dark:text-gray-100 break-all" id="modal-api-key">
+                <!-- Key will be inserted here -->
+            </code>
+        </div>
+        
+        <div class="flex space-x-3">
+            <button
+                id="modal-copy-btn"
+                class="flex-1 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors"
+            >
+                📋 Copy Key
+            </button>
+            <button
+                id="modal-close-btn"
+                class="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
+            >
+                I've Copied It
+            </button>
+        </div>
+        
+        <p class="text-xs text-gray-500 mt-4 text-center">
+            After closing this dialog, only a masked version will be shown for security.
+        </p>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div id="confirm-modal" class="fixed inset-0 bg-black/73 bg-opacity-50 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full p-6 relative">
+        <div class="text-center mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                🔄 Regenerate API Key?
+            </h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+                This will invalidate your current API key and any applications using it will stop working.
+            </p>
+        </div>
+        
+        <div class="flex space-x-3">
+            <button
+                id="confirm-cancel-btn"
+                class="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-500 transition-colors"
+            >
+                Cancel
+            </button>
+            <button
+                id="confirm-ok-btn"
+                class="flex-1 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            >
+                Yes, Regenerate
+            </button>
+        </div>
+    </div>
+</div>
+
+<script define:vars={{ initialApiKey, sessionToken, apiKeyCreatedAt, apiKeyLastUsed, apiUrl }}>
+    // State management
+    let apiKey = initialApiKey;
+    let isFullKey = initialApiKey && !initialApiKey.includes('...');
+
+    // Elements
+    const regenerateKeyBtn = document.getElementById("regenerate-key-btn");
+    const generateKeyBtn = document.getElementById("generate-key-btn");
+    const usageExampleEl = document.getElementById("usage-example");
+    
+    // Modal elements
+    const modal = document.getElementById("api-key-modal");
+    const modalApiKey = document.getElementById("modal-api-key");
+    const modalCopyBtn = document.getElementById("modal-copy-btn");
+    const modalCloseBtn = document.getElementById("modal-close-btn");
+    
+    // Confirmation modal elements
+    const confirmModal = document.getElementById("confirm-modal");
+    const confirmOkBtn = document.getElementById("confirm-ok-btn");
+    const confirmCancelBtn = document.getElementById("confirm-cancel-btn");
+
+    // API client implementation (inlined for browser compatibility)
+    class ApiClient {
+        constructor(baseUrl, getAuthToken) {
+            this.baseUrl = baseUrl;
+            this.getAuthToken = getAuthToken;
+        }
+
+        async makeRequest(path, options = {}) {
+            const token = await this.getAuthToken();
+            if (!token) {
+                throw new Error('No authentication token available');
+            }
+
+            const headers = {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+                ...options.headers,
+            };
+
+            const response = await fetch(`${this.baseUrl}${path}`, {
+                ...options,
+                headers,
+            });
+
+            if (!response.ok) {
+                throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+            }
+
+            return response;
+        }
+
+        async getApiKey() {
+            const response = await this.makeRequest('/apikey');
+            return response.json();
+        }
+
+        async regenerateApiKey() {
+            const response = await this.makeRequest('/apikey/regenerate', {
+                method: 'POST',
+            });
+            return response.json();
+        }
+    }
+
+    // Create API client instance
+    function getApiClient() {
+        return new ApiClient(apiUrl, async () => sessionToken);
+    }
+
+    // Show modal with API key
+    function showApiKeyModal(key) {
+        if (modal && modalApiKey) {
+            modalApiKey.textContent = key;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+    }
+
+    // Hide modal
+    function hideApiKeyModal() {
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    }
+
+    // Show confirmation modal
+    function showConfirmModal() {
+        if (confirmModal) {
+            confirmModal.classList.remove('hidden');
+            confirmModal.classList.add('flex');
+        }
+    }
+
+    // Hide confirmation modal
+    function hideConfirmModal() {
+        if (confirmModal) {
+            confirmModal.classList.add('hidden');
+            confirmModal.classList.remove('flex');
+        }
+    }
+
+    // Custom confirm function that returns a Promise
+    function customConfirm() {
+        return new Promise((resolve) => {
+            showConfirmModal();
+            
+            const handleOk = () => {
+                hideConfirmModal();
+                confirmOkBtn?.removeEventListener('click', handleOk);
+                confirmCancelBtn?.removeEventListener('click', handleCancel);
+                resolve(true);
+            };
+            
+            const handleCancel = () => {
+                hideConfirmModal();
+                confirmOkBtn?.removeEventListener('click', handleOk);
+                confirmCancelBtn?.removeEventListener('click', handleCancel);
+                resolve(false);
+            };
+            
+            confirmOkBtn?.addEventListener('click', handleOk);
+            confirmCancelBtn?.addEventListener('click', handleCancel);
+        });
+    }
+
+    // Update usage example
+    function updateUsageExample() {
+        if (!usageExampleEl) return;
+
+        usageExampleEl.textContent = `# Authenticate with your API key
+curl -H "Authorization: Bearer YOUR_API_KEY" \\
+  https://ids.moe/mal/1
+
+# Or use it as a query parameter
+curl https://ids.moe/mal/1?key=YOUR_API_KEY`;
+    }
+
+    // Copy text to clipboard
+    async function copyToClipboard(text, button) {
+        try {
+            await navigator.clipboard.writeText(text);
+            const originalText = button.textContent;
+            button.textContent = "Copied!";
+            setTimeout(() => {
+                button.textContent = originalText;
+            }, 2000);
+        } catch (err) {
+            console.error("Failed to copy:", err);
+        }
+    }
+
+    // Modal copy button
+    modalCopyBtn?.addEventListener("click", async () => {
+        if (modalApiKey) {
+            await copyToClipboard(modalApiKey.textContent, modalCopyBtn);
+        }
+    });
+
+    // Modal close button
+    modalCloseBtn?.addEventListener("click", () => {
+        hideApiKeyModal();
+        // Reload the page to show the masked version
+        window.location.reload();
+    });
+
+    // Close modal when clicking outside
+    modal?.addEventListener("click", (e) => {
+        if (e.target === modal) {
+            hideApiKeyModal();
+            window.location.reload();
+        }
+    });
+
+    // Close confirmation modal when clicking outside
+    confirmModal?.addEventListener("click", (e) => {
+        if (e.target === confirmModal) {
+            hideConfirmModal();
+        }
+    });
+
+    // Generate new key (for users without a key)
+    generateKeyBtn?.addEventListener("click", async () => {
+        if (!generateKeyBtn) return;
+
+        generateKeyBtn.disabled = true;
+        generateKeyBtn.textContent = "Generating...";
+
+        try {
+            const client = getApiClient();
+            const response = await client.getApiKey(); // This will generate a new key
+            
+            if (response.key) {
+                showApiKeyModal(response.key);
+            }
+        } catch (error) {
+            console.error('Failed to generate key:', error);
+            generateKeyBtn.textContent = "Error - Try Again";
+            setTimeout(() => {
+                generateKeyBtn.textContent = "Generate API Key";
+            }, 2000);
+        } finally {
+            generateKeyBtn.disabled = false;
+        }
+    });
+
+    // Regenerate key
+    regenerateKeyBtn?.addEventListener("click", async () => {
+        if (!regenerateKeyBtn) return;
+
+        const confirmed = await customConfirm();
+        if (!confirmed) {
+            return;
+        }
+
+        regenerateKeyBtn.disabled = true;
+        regenerateKeyBtn.textContent = "Regenerating...";
+
+        try {
+            const client = getApiClient();
+            const response = await client.regenerateApiKey();
+            
+            if (response.key) {
+                showApiKeyModal(response.key);
+            }
+        } catch (error) {
+            console.error('Failed to regenerate key:', error);
+            regenerateKeyBtn.textContent = "Error - Try Again";
+            setTimeout(() => {
+                regenerateKeyBtn.textContent = "Regenerate";
+            }, 2000);
+        } finally {
+            regenerateKeyBtn.disabled = false;
+        }
+    });
+
+    // Show modal on page load if we have a full key
+    if (isFullKey && apiKey) {
+        showApiKeyModal(apiKey);
+    }
+
+    // Initial setup
+    updateUsageExample();
+</script>
