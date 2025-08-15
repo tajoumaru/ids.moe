@@ -6,6 +6,7 @@ import {
     SignInButton,
 } from "@clerk/astro/components";
 import ThemeIcon from "../components/ThemeIcon.astro";
+import GithubIcon from "../components/GithubIcon.astro";
 
 import "../styles/global.css";
 
@@ -52,12 +53,10 @@ const { title = "ids.moe - Anime ID Mapping API" } = Astro.props;
                                     Home
                                 </a>
                                 <a
-                                    href="https://github.com/tajoumaru/ids.moe"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                    href="/docs"
                                     class="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 inline-flex items-center px-1 pt-1 text-sm font-medium"
                                 >
-                                    Source Code
+                                    API Docs
                                 </a>
                                 <SignedIn>
                                     <a
@@ -82,6 +81,9 @@ const { title = "ids.moe - Anime ID Mapping API" } = Astro.props;
                             <SignedIn>
                                 <UserButton />
                             </SignedIn>
+                            <div class="border-r-1 border-r-gray-600 h-7.5">
+                            </div>
+                            <GithubIcon />
                             <ThemeIcon />
                         </div>
                     </div>

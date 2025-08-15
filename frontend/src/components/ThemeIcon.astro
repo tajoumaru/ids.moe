@@ -2,7 +2,7 @@
 
 ---
 
-<button id="themeToggle">
+<button id="themeToggle" class="cursor-pointer">
     <svg width="30px" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
         <path
             class="sun"
@@ -23,7 +23,7 @@
         background: none;
     }
     .sun {
-        fill: black;
+        fill: var(--color-gray-600);
     }
     .moon {
         fill: transparent;
@@ -33,7 +33,7 @@
         fill: transparent;
     }
     :global(.dark) .moon {
-        fill: white;
+        fill: var(--color-gray-400);
     }
 </style>
 
@@ -51,8 +51,10 @@
 
     if (theme === "light") {
         document.documentElement.classList.remove("dark");
+        document.documentElement.setAttribute("data-theme", "light");
     } else {
         document.documentElement.classList.add("dark");
+        document.documentElement.setAttribute("data-theme", "dark");
     }
 
     window.localStorage.setItem("theme", theme);
@@ -63,9 +65,12 @@
 
         const isDark = element.classList.contains("dark");
         localStorage.setItem("theme", isDark ? "dark" : "light");
+        element.setAttribute("data-theme", isDark ? "dark" : "light");
 
         // Dispatch custom event for Clerk theme update
-        window.dispatchEvent(new CustomEvent("themeChanged", { detail: { isDark } }));
+        window.dispatchEvent(
+            new CustomEvent("themeChanged", { detail: { isDark } })
+        );
     };
 
     document

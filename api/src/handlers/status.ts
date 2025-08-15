@@ -76,10 +76,34 @@ export async function handleHeartbeat(context: RouteContext, startTime: number):
 }
 
 export async function handleSchema(): Promise<Response> {
-  // This is a fallback if the static asset is not available
-  return createJsonResponse({
-    message: 'Schema endpoint - please check static assets configuration'
-  });
+  // Fallback OpenAPI schema if static asset is not available
+  const fallbackSchema = {
+    openapi: "3.0.3",
+    info: {
+      title: "ids.moe API",
+      description: "High-performance anime ID mapping API providing cross-platform anime database ID relationships.",
+      version: "2.0.0",
+      license: {
+        name: "AGPL-3.0-only",
+        url: "https://github.com/tajoumaru/ids.moe/blob/main/LICENSE"
+      }
+    },
+    servers: [{ url: "https://api.ids.moe", description: "Production server" }],
+    paths: {},
+    components: {
+      schemas: {},
+      securitySchemes: {
+        apiKey: {
+          type: "apiKey",
+          in: "header", 
+          name: "X-API-Key",
+          description: "API key required for most endpoints"
+        }
+      }
+    }
+  };
+  
+  return createJsonResponse(fallbackSchema);
 }
 
 export async function handleUpdated(context: RouteContext): Promise<Response> {
