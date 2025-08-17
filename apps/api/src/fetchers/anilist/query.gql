@@ -1,0 +1,19 @@
+query AnilistQuery($mediaId: Int) {
+  Media(id: $mediaId) {
+    title {
+      english
+      native
+      romaji
+    }
+    description
+    genres
+    season
+    seasonYear
+    format
+    episodes
+    averageScore
+    coverImage {
+      extraLarge
+    }
+  }
+}

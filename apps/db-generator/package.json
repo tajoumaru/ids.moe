@@ -1,0 +1,13 @@
+{
+  "name": "db-generator",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "generate": "uv run generator",
+    "lint": "uv run ruff check .",
+    "lint:fix": "uv run ruff check --fix .",
+    "lint:fix:unsafe": "uv run ruff check --fix --unsafe-fixes .",
+    "format": "uv run ruff format .",
+    "type-check": "uv run ty check ."
+  }
+}

@@ -1,0 +1,615 @@
+{
+    "openapi": "3.1.1",
+    "info": {
+        "title": "IDS.moe Anime ID Mapping API",
+        "description": "High-performance anime ID mapping API that provides cross-platform anime database ID relationships. Maps anime IDs between 21 different platforms (MyAnimeList, AniList, AniDB, Kitsu, IMDB, etc.).",
+        "version": "1.0.0",
+        "contact": {
+            "url": "https://ids.moe"
+        },
+        "license": {
+            "name": "AGPL-3.0-only",
+            "url": "https://github.com/tajoumaru/ids.moe/blob/main/LICENSE"
+        }
+    },
+    "servers": [
+        {
+            "url": "https://api.ids.moe",
+            "description": "Production server"
+        }
+    ],
+    "paths": {
+        "/{platform}/{id}": {
+            "get": {
+                "summary": "Get all platform IDs for an anime",
+                "parameters": [
+                    {
+                        "name": "platform",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "anidb",
+                                "ad",
+                                "adb",
+                                "anilist",
+                                "al",
+                                "animenewsnetwork",
+                                "an",
+                                "ann",
+                                "animeplanet",
+                                "anime-planet",
+                                "ap",
+                                "anisearch",
+                                "as",
+                                "annict",
+                                "ac",
+                                "act",
+                                "anc",
+                                "imdb",
+                                "im",
+                                "kaize",
+                                "kz",
+                                "kitsu",
+                                "kt",
+                                "kts",
+                                "livechart",
+                                "lc",
+                                "myanimelist",
+                                "mal",
+                                "ma",
+                                "nautiljon",
+                                "nj",
+                                "ntj",
+                                "notify",
+                                "nf",
+                                "ntf",
+                                "ntm",
+                                "notifymoe",
+                                "otakotaku",
+                                "oo",
+                                "shikimori",
+                                "sh",
+                                "shk",
+                                "shiki",
+                                "shoboi",
+                                "sb",
+                                "shb",
+                                "syb",
+                                "syoboi",
+                                "shobocal",
+                                "syobocal",
+                                "silveryasha",
+                                "sy",
+                                "dbti",
+                                "simkl",
+                                "sm",
+                                "smk",
+                                "animecountdown",
+                                "themoviedb",
+                                "tm",
+                                "tmdb",
+                                "trakt",
+                                "tr",
+                                "trk"
+                            ]
+                        },
+                        "description": "Platform name or alias"
+                    },
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "oneOf": [{ "type": "integer" }, { "type": "string" }]
+                        },
+                        "description": "Platform-specific ID (number or string depending on platform)"
+                    }
+                ],
+                "security": [{ "apiKey": [] }],
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Anime"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - API key required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Anime not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/status": {
+            "get": {
+                "summary": "Database statistics and platform counts",
+                "tags": ["System"],
+                "responses": {
+                    "200": {
+                        "description": "Status information",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Status"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/heartbeat": {
+            "get": {
+                "summary": "Health check with response time",
+                "tags": ["System"],
+                "responses": {
+                    "200": {
+                        "description": "Health check response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Heartbeat"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/redirect": {
+            "get": {
+                "summary": "Platform redirects",
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "Source platform"
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "anidb",
+                                "ad",
+                                "adb",
+                                "anilist",
+                                "al",
+                                "animenewsnetwork",
+                                "an",
+                                "ann",
+                                "animeplanet",
+                                "anime-planet",
+                                "ap",
+                                "anisearch",
+                                "as",
+                                "annict",
+                                "ac",
+                                "act",
+                                "anc",
+                                "imdb",
+                                "im",
+                                "kaize",
+                                "kz",
+                                "kitsu",
+                                "kt",
+                                "kts",
+                                "livechart",
+                                "lc",
+                                "myanimelist",
+                                "mal",
+                                "ma",
+                                "nautiljon",
+                                "nj",
+                                "ntj",
+                                "notify",
+                                "nf",
+                                "ntf",
+                                "ntm",
+                                "notifymoe",
+                                "otakotaku",
+                                "oo",
+                                "shikimori",
+                                "sh",
+                                "shk",
+                                "shiki",
+                                "shoboi",
+                                "sb",
+                                "shb",
+                                "syb",
+                                "syoboi",
+                                "shobocal",
+                                "syobocal",
+                                "silveryasha",
+                                "sy",
+                                "dbti",
+                                "simkl",
+                                "sm",
+                                "smk",
+                                "animecountdown",
+                                "themoviedb",
+                                "tm",
+                                "tmdb",
+                                "trakt",
+                                "tr",
+                                "trk"
+                            ]
+                        },
+                        "description": "Target platform"
+                    },
+                    {
+                        "name": "id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "oneOf": [{ "type": "integer" }, { "type": "string" }]
+                        },
+                        "description": "ID to redirect"
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirect to target platform"
+                    },
+                    "404": {
+                        "description": "Anime not found"
+                    }
+                }
+            }
+        },
+        "/schema": {
+            "get": {
+                "summary": "API schema documentation",
+                "tags": ["System"],
+                "responses": {
+                    "200": {
+                        "description": "OpenAPI schema",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "Anime": {
+                "type": "object",
+                "title": "Anime Schema",
+                "description": "Schema for anime",
+                "properties": {
+                    "title": {
+                        "type": "string",
+                        "title": "Title",
+                        "description": "Title of the anime"
+                    },
+                    "anidb": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "aniDB",
+                        "description": "aniDB ID, website: https://anidb.net/"
+                    },
+                    "anilist": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "AniList",
+                        "description": "AniList ID, website: https://anilist.co/"
+                    },
+                    "animenewsnetwork": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "Anime News Network",
+                        "description": "Anime News Network, website: https://animenewsnetwork.com"
+                    },
+                    "animeplanet": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "pattern": "^[a-z0-9\\-]+$"
+                            },
+                            { "type": "null" }
+                        ],
+                        "default": null,
+                        "title": "Anime-Planet",
+                        "description": "Anime-Planet slug, website: https://www.anime-planet.com/"
+                    },
+                    "anisearch": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "AniSearch",
+                        "description": "AniSearch ID, website: https://www.anisearch.com/, https://anisearch.de, https://anisearch.it, https://anisearch.es, https://anisearch.fr, https://anisearch.jp"
+                    },
+                    "annict": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "Annict",
+                        "description": "Annict ID, website: https://annict.com/, https://en.annict.com/, https://annict.jp/"
+                    },
+                    "imdb": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "pattern": "^tt[\\d]+$"
+                            },
+                            { "type": "null" }
+                        ],
+                        "default": null,
+                        "title": "IMDb",
+                        "description": "IMDb ID, website: https://www.imdb.com/"
+                    },
+                    "kaize": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "pattern": "^[a-z0-9\\-]+$"
+                            },
+                            { "type": "null" }
+                        ],
+                        "default": null,
+                        "title": "Kaize",
+                        "description": "Kaize slug, website: https://kaize.io/"
+                    },
+                    "kaize_id": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "Kaize ID",
+                        "description": "Kaize ID in integer format, not recommended as some entry can't be found its ID compared to slug"
+                    },
+                    "kitsu": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "Kitsu",
+                        "description": "Kitsu ID in integer, slug not suppported, website: https://kitsu.app/"
+                    },
+                    "livechart": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "LiveChart",
+                        "description": "LiveChart ID, website: https://www.livechart.me/"
+                    },
+                    "myanimelist": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "MyAnimeList",
+                        "description": "MyAnimeList ID, website: https://myanimelist.net/"
+                    },
+                    "nautiljon": {
+                        "oneOf": [{ "type": "string" }, { "type": "null" }],
+                        "default": null,
+                        "title": "Nautiljon",
+                        "description": "Nautiljon slug in plus, website: https://www.nautiljon.com/"
+                    },
+                    "nautiljon_id": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "Nautiljon ID",
+                        "description": "Nautiljon ID in integer format, used internally"
+                    },
+                    "notify": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "pattern": "^[a-zA-Z0-9\\-\\_]+$"
+                            },
+                            { "type": "null" }
+                        ],
+                        "default": null,
+                        "title": "Notify.moe",
+                        "description": "Notify.moe Base64 ID, website: https://notify.moe/"
+                    },
+                    "otakotaku": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "Otak Otaku",
+                        "description": "Otak Otaku ID, website: https://otakotaku.com/"
+                    },
+                    "shikimori": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "Shikimori/Шикимори",
+                        "description": "Shikimori ID (nonprefixed), based on MyAnimeList ID. Remove prefix if found on the ID, website: https://shikimori.one/"
+                    },
+                    "shoboi": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "Shoboi/Syobocal/しょぼいカレンダー",
+                        "description": "Shoboi ID, website: http://cal.syoboi.jp/"
+                    },
+                    "silveryasha": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "Silveryasha",
+                        "description": "Silveryasha ID, website: https://db.silveryasha.id/"
+                    },
+                    "simkl": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "SIMKL",
+                        "description": "SIMKL ID, website: https://simkl.com/"
+                    },
+                    "themoviedb": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "The Movie Database (TMDB)",
+                        "description": "The Movie Database ID, website: https://www.themoviedb.org/"
+                    },
+                    "themoviedb_season": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "The Movie Database (TMDB) Season",
+                        "description": "The Movie Database season number, only used if themoviedb_type is 'shows', else null"
+                    },
+                    "themoviedb_type": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "enum": ["movie", "tv"]
+                            },
+                            { "type": "null" }
+                        ],
+                        "default": null,
+                        "title": "The Movie Database (TMDB) Type",
+                        "description": "The Movie Database type, either 'movie' or 'tv'"
+                    },
+                    "trakt": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "Trakt",
+                        "description": "Trakt ID, slug not supported, website: https://trakt.tv/"
+                    },
+                    "trakt_season": {
+                        "oneOf": [{ "type": "number" }, { "type": "null" }],
+                        "default": null,
+                        "title": "Trakt Season",
+                        "description": "Trakt season number, only used if trakt_type is 'shows', else null"
+                    },
+                    "trakt_type": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "enum": ["movies", "shows"]
+                            },
+                            { "type": "null" }
+                        ],
+                        "default": null,
+                        "title": "Trakt Type",
+                        "description": "Trakt type, either 'movies' or 'shows'"
+                    }
+                },
+                "required": [
+                    "title",
+                    "anidb",
+                    "anilist",
+                    "animenewsnetwork",
+                    "animeplanet",
+                    "anisearch",
+                    "annict",
+                    "imdb",
+                    "kaize",
+                    "kaize_id",
+                    "kitsu",
+                    "livechart",
+                    "myanimelist",
+                    "nautiljon",
+                    "nautiljon_id",
+                    "notify",
+                    "otakotaku",
+                    "shikimori",
+                    "shoboi",
+                    "silveryasha",
+                    "simkl",
+                    "themoviedb",
+                    "trakt",
+                    "trakt_type",
+                    "trakt_season"
+                ],
+                "additionalProperties": false,
+                "dependentRequired": {
+                    "themoviedb_type": ["themoviedb_season"],
+                    "trakt_type": ["trakt_season"]
+                }
+            },
+            "Error": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string"
+                    },
+                    "code": {
+                        "type": "integer"
+                    },
+                    "message": {
+                        "type": "string"
+                    }
+                },
+                "required": ["error", "code", "message"]
+            },
+            "Status": {
+                "type": "object",
+                "properties": {
+                    "total_anime": {
+                        "type": "integer"
+                    },
+                    "platform_counts": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
+                    }
+                }
+            },
+            "Heartbeat": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": ["OK"]
+                    },
+                    "code": {
+                        "type": "integer",
+                        "enum": [200]
+                    },
+                    "request_time": {
+                        "type": "string",
+                        "description": "Request time in seconds"
+                    },
+                    "response_time": {
+                        "type": "string",
+                        "description": "Response time in seconds"
+                    },
+                    "request_epoch": {
+                        "type": "number",
+                        "description": "Request timestamp in Unix epoch"
+                    }
+                },
+                "required": ["status", "code", "request_time", "response_time", "request_epoch"]
+            }
+        },
+        "securitySchemes": {
+            "apiKey": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-Key",
+                "description": "API key required for most endpoints"
+            },
+            "clerkAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "description": "Clerk JWT authentication for API key management"
+            }
+        }
+    }
+}

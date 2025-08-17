@@ -1,0 +1,30 @@
+{
+    "$schema": "https://turborepo.com/schema.json",
+    "tasks": {
+        "build": {
+            "dependsOn": ["^build"],
+            "outputs": [".astro/**", "dist/**", ".wrangler/**"]
+        },
+        "deploy": {
+            "dependsOn": ["build", "^deploy"],
+            "env": ["CLOUDFLARE_API_TOKEN"]
+        },
+        "type-check": {
+            "dependsOn": ["^type-check"]
+        },
+        "cf-typegen": {
+            "dependsOn": ["type-check"]
+        },
+        "lint": {},
+        "lint:fix": {},
+        "lint:fix:unsafe": {},
+        "format": {},
+        "prepare": {
+            "dependsOn": ["lint:fix", "format"]
+        },
+        "dev": {
+            "persistent": true,
+            "cache": false
+        }
+    }
+}

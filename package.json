@@ -1,0 +1,25 @@
+{
+  "name": "ids.moe",
+  "version": "1.0.0",
+  "description": "",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.14.0",
+  "scripts": {
+    "build": "turbo run build",
+    "deploy": "turbo run deploy",
+    "dev": "turbo run dev --ui tui",
+    "type-check": "turbo run type-check",
+    "cf-typegen": "turbo run cf-typegen",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
+    "lint:fix:unsafe": "turbo run lint:fix:unsafe",
+    "prepare": "turbo run prepare",
+    "format": "turbo run format"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.0",
+    "turbo": "^2.5.6"
+  }
+}

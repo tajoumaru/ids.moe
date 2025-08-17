@@ -1,0 +1,22 @@
+{
+    "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
+    "extends": "//",
+    "files": {
+        "includes": [
+            "src/**/*.{astro,ts,css}"
+        ]
+    },
+    /* Below rules for better `.astro` files compat */
+    "linter": {
+        "rules": {
+            "style": {
+                "useConst": "off",
+                "useImportType": "off"
+            },
+            "correctness": {
+                "noUnusedVariables": "off",
+                "noUnusedImports": "off"
+            }
+        }
+    }
+}

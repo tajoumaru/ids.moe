@@ -1,0 +1,34 @@
+---
+import UserDashboard from "../components/UserDashboard";
+import SiteLayout from "../layouts/SiteLayout.astro";
+
+// Get auth data from Astro locals
+const { userId, getToken } = Astro.locals.auth();
+
+// Redirect if not authenticated
+if (!userId) {
+    return Astro.redirect("/login");
+}
+
+// Get current user data
+const user = await Astro.locals.currentUser();
+
+// Get Clerk session token for API authentication
+const sessionToken = await getToken();
+
+// Determine API URL based on environment
+const isLocal = Astro.url.hostname === "localhost" || Astro.url.hostname === "127.0.0.1";
+const apiUrl = isLocal ? "http://localhost:8787" : "https://api.ids.moe";
+
+const userName = user?.firstName || user?.emailAddresses?.[0]?.emailAddress || "User";
+---
+
+<SiteLayout title="Dashboard - ids.moe">
+    <UserDashboard 
+        client:load
+        userId={userId}
+        userName={userName}
+        sessionToken={sessionToken}
+        apiUrl={apiUrl}
+    />
+</SiteLayout>

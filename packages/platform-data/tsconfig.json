@@ -1,0 +1,13 @@
+{
+  "extends": "@repo/typescript-config/base.tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "declaration": true,
+    "emitDeclarationOnly": false,
+    "rootDir": "./src",
+    "noEmit": false,
+    "moduleResolution": "node"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

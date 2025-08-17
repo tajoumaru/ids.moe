@@ -1,0 +1,41 @@
+{
+    "name": "frontend",
+    "type": "module",
+    "private": true,
+    "version": "1.0.0",
+    "scripts": {
+        "dev": "astro dev",
+        "build": "astro build",
+        "deploy": "wrangler deploy",
+        "cf-typegen": "wrangler types",
+        "type-check": "tsc --noEmit",
+        "lint": "biome lint .",
+        "lint:fix": "biome lint --fix .",
+        "lint:fix:unsafe": "biome lint --fix --unsafe .",
+        "format": "biome check --linter-enabled=false --fix ."
+    },
+    "dependencies": {
+        "@astrojs/cloudflare": "^12.6.3",
+        "@astrojs/react": "^4.3.0",
+        "@clerk/astro": "^2.11.2",
+        "@clerk/themes": "^2.4.9",
+        "@repo/platform-data": "workspace:*",
+        "@stoplight/elements": "^9.0.6",
+        "@tailwindcss/vite": "^4.1.12",
+        "@types/react": "^19.1.10",
+        "@types/react-dom": "^19.1.7",
+        "astro": "^5.13.0",
+        "react": "^19.1.1",
+        "react-dom": "^19.1.1",
+        "tailwindcss": "^4.1.12"
+    },
+    "devDependencies": {
+        "@repo/typescript-config": "workspace:*",
+        "@types/node": "^24.2.1",
+        "buffer": "^6.0.3",
+        "openapi-typescript": "^7.9.1",
+        "process": "^0.11.10",
+        "util": "^0.12.5",
+        "wrangler": "^4.30.0"
+    }
+}

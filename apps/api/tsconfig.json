@@ -1,0 +1,8 @@
+{
+    "extends": "@repo/typescript-config/base.tsconfig.json",
+    "compilerOptions": {
+        "types": ["./worker-configuration.d.ts"]
+    },
+    "exclude": ["test"],
+    "include": ["worker-configuration.d.ts", "src/**/*.ts"]
+}

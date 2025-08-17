@@ -1,0 +1,23 @@
+{
+  "extends": [
+    "astro/tsconfigs/strict",
+    "@repo/typescript-config/base.tsconfig.json"
+  ],
+  "include": [
+    ".astro/types.d.ts",
+    "**/*"
+  ],
+  "exclude": [
+    "dist"
+  ],
+  "compilerOptions": {
+    "types": [
+      "./worker-configuration.d.ts",
+      "node"
+    ],
+    "jsxImportSource": "react",
+    "paths": {
+      "@stoplight/elements": ["./node_modules/@stoplight/elements/index.d.ts"]
+    }
+  }
+}

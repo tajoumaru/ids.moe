@@ -1,0 +1,7 @@
+{
+    "$schema": "../../node_modules/@biomejs/biome/configuration_schema.json",
+    "extends": "//",
+    "files": {
+        "includes": ["{src,test}/**/*.ts", "assets/**/*.json", "*.{ts,json,jsonc,mts}", "!worker-configuration.d.ts"]
+    }
+}
